@@ -8,7 +8,6 @@ pistachio/
 .idea/
 .vscode/
 
-results/
 node_modules/
 coverage/
 
