@@ -1,0 +1,29 @@
+{
+  "run": "uspto_50k_test_250_Olmo-3-7B-Instruct",
+  "model_id": "allenai/Olmo-3-7B-Instruct",
+  "thinking": false,
+  "max_new_tokens": 1024,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_scored": 250,
+  "n_total": 250,
+  "timestamp": "2026-09-18T22:58:27",
+  "top1": {
+    "all_correct": 0.0,
+    "any_correct": 0.0,
+    "maxfrag": 0.0,
+    "n_all_correct": 0,
+    "n_any_correct": 0,
+    "n_maxfrag": 0
+  },
+  "topk": {
+    "all_correct": 0.0,
+    "any_correct": 0.0,
+    "maxfrag": 0.0,
+    "n_all_correct": 0,
+    "n_any_correct": 0,
+    "n_maxfrag": 0
+  },
+  "parse_failures_pct": 7.2,
+  "invalid_smiles_pct": 78.8,
+  "mean_proposals": 2.808
+}

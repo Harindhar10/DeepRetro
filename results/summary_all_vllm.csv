@@ -1,0 +1,4 @@
+run,model_id,thinking,max_new_tokens,data_csv,n_scored,n_total,timestamp,parse_failures_pct,invalid_smiles_pct,mean_proposals,top1_all_correct,top1_any_correct,top1_maxfrag,top1_n_all_correct,top1_n_any_correct,top1_n_maxfrag,topk_all_correct,topk_any_correct,topk_maxfrag,topk_n_all_correct,topk_n_any_correct,topk_n_maxfrag
+uspto_50k_test_250_Qwen3-32B,Qwen/Qwen3-32B,False,1024,/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv,250,250,2026-09-18T22:58:26,0.4,40.0,4.144,0.8,6.4,3.2,2,16,8,1.6,9.2,5.6,4,23,14
+uspto_50k_test_250_Olmo-3-7B-Instruct,allenai/Olmo-3-7B-Instruct,False,1024,/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv,250,250,2026-09-18T22:58:27,7.2,78.8,2.808,0.0,0.0,0.0,0,0,0,0.0,0.0,0.0,0,0,0
+uspto_50k_test_250_Qwen3-8B,Qwen/Qwen3-8B,False,1024,/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv,250,250,2026-09-18T22:58:27,0.0,11.6,3.356,0.0,0.0,0.0,0,0,0,0.0,1.2,0.4,0,3,1

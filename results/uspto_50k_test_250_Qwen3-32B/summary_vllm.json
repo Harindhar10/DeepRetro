@@ -1,0 +1,29 @@
+{
+  "run": "uspto_50k_test_250_Qwen3-32B",
+  "model_id": "Qwen/Qwen3-32B",
+  "thinking": false,
+  "max_new_tokens": 1024,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_scored": 250,
+  "n_total": 250,
+  "timestamp": "2026-09-18T22:58:26",
+  "top1": {
+    "all_correct": 0.8,
+    "any_correct": 6.4,
+    "maxfrag": 3.2,
+    "n_all_correct": 2,
+    "n_any_correct": 16,
+    "n_maxfrag": 8
+  },
+  "topk": {
+    "all_correct": 1.6,
+    "any_correct": 9.2,
+    "maxfrag": 5.6,
+    "n_all_correct": 4,
+    "n_any_correct": 23,
+    "n_maxfrag": 14
+  },
+  "parse_failures_pct": 0.4,
+  "invalid_smiles_pct": 40.0,
+  "mean_proposals": 4.144
+}

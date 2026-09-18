@@ -1,0 +1,29 @@
+{
+  "run": "uspto_50k_test_250_Qwen3-8B",
+  "model_id": "Qwen/Qwen3-8B",
+  "thinking": false,
+  "max_new_tokens": 1024,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_scored": 250,
+  "n_total": 250,
+  "timestamp": "2026-09-18T22:58:27",
+  "top1": {
+    "all_correct": 0.0,
+    "any_correct": 0.0,
+    "maxfrag": 0.0,
+    "n_all_correct": 0,
+    "n_any_correct": 0,
+    "n_maxfrag": 0
+  },
+  "topk": {
+    "all_correct": 0.0,
+    "any_correct": 1.2,
+    "maxfrag": 0.4,
+    "n_all_correct": 0,
+    "n_any_correct": 3,
+    "n_maxfrag": 1
+  },
+  "parse_failures_pct": 0.0,
+  "invalid_smiles_pct": 11.6,
+  "mean_proposals": 3.356
+}

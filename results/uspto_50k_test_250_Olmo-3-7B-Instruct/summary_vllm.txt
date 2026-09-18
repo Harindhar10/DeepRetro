@@ -1,0 +1,19 @@
+model: allenai/Olmo-3-7B-Instruct
+scored 250 / 250 molecules from /root/workspace/DFS/DeepRetro/results/uspto_50k_test_250_Olmo-3-7B-Instruct/raw_generations_vllm.jsonl
+
+=== top-1 (first proposal -- prod_challenge protocol) ===
+All correct % 0.0  (0/250)
+Any correct % 0.0  (0/250)
+MaxFrag     % 0.0  (0/250)
+
+=== top-k (best of the 3-5 proposals) ===
+All correct % 0.0  (0/250)
+Any correct % 0.0  (0/250)
+MaxFrag     % 0.0  (0/250)
+
+=== response quality ===
+parse failures  : 7.20%
+invalid SMILES  : 78.80%
+mean proposals  : 2.81
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.
