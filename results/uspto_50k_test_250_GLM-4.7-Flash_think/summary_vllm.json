@@ -1,0 +1,29 @@
+{
+  "run": "uspto_50k_test_250_GLM-4.7-Flash_think",
+  "model_id": "zai-org/GLM-4.7-Flash",
+  "thinking": true,
+  "max_new_tokens": 16384,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_scored": 10,
+  "n_total": 250,
+  "timestamp": "2026-09-21T19:51:43",
+  "top1": {
+    "all_correct": 0.0,
+    "any_correct": 0.0,
+    "maxfrag": 0.0,
+    "n_all_correct": 0,
+    "n_any_correct": 0,
+    "n_maxfrag": 0
+  },
+  "topk": {
+    "all_correct": 0.0,
+    "any_correct": 0.0,
+    "maxfrag": 0.0,
+    "n_all_correct": 0,
+    "n_any_correct": 0,
+    "n_maxfrag": 0
+  },
+  "parse_failures_pct": 40.0,
+  "invalid_smiles_pct": 40.0,
+  "mean_proposals": 2.2
+}

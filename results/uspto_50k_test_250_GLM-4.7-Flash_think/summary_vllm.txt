@@ -1,0 +1,19 @@
+model: zai-org/GLM-4.7-Flash
+scored 10 / 250 molecules from /root/workspace/DFS/DeepRetro/results/uspto_50k_test_250_GLM-4.7-Flash_think/raw_generations_vllm.jsonl
+
+=== top-1 (first proposal -- prod_challenge protocol) ===
+All correct % 0.0  (0/10)
+Any correct % 0.0  (0/10)
+MaxFrag     % 0.0  (0/10)
+
+=== top-k (best of the 3-5 proposals) ===
+All correct % 0.0  (0/10)
+Any correct % 0.0  (0/10)
+MaxFrag     % 0.0  (0/10)
+
+=== response quality ===
+parse failures  : 40.00%
+invalid SMILES  : 40.00%
+mean proposals  : 2.20
+
+Denominator is all 10 scored rows -- parse failures count as incorrect.

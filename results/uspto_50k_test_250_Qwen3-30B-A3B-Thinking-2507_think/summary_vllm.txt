@@ -1,0 +1,19 @@
+model: Qwen/Qwen3-30B-A3B-Thinking-2507
+scored 10 / 250 molecules from /root/workspace/DFS/DeepRetro/results/uspto_50k_test_250_Qwen3-30B-A3B-Thinking-2507_think/raw_generations_vllm.jsonl
+
+=== top-1 (first proposal -- prod_challenge protocol) ===
+All correct % 0.0  (0/10)
+Any correct % 10.0  (1/10)
+MaxFrag     % 0.0  (0/10)
+
+=== top-k (best of the 3-5 proposals) ===
+All correct % 10.0  (1/10)
+Any correct % 20.0  (2/10)
+MaxFrag     % 10.0  (1/10)
+
+=== response quality ===
+parse failures  : 0.00%
+invalid SMILES  : 70.00%
+mean proposals  : 3.00
+
+Denominator is all 10 scored rows -- parse failures count as incorrect.
