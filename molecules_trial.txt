@@ -1,0 +1,1 @@
+COC(=O)c1cccc(C(=O)N2CCC(CCN3C4CCC3CC(n3c(C)nc5ccccc53)C4)(c3ccccc3)CC2)c1
