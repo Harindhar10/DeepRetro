@@ -31,8 +31,8 @@ logger = structlog.get_logger()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-AZ_MODEL_CONFIG_PATH = f"{PROJECT_ROOT}/{os.getenv('AZ_MODEL_CONFIG_PATH')}"
-AZ_MODELS_PATH = f"{PROJECT_ROOT}/{os.getenv('AZ_MODELS_PATH')}"
+AZ_MODEL_CONFIG_PATH = "/root/workspace/DFS/aizynthfinder/models/USPTO/config.yml"
+AZ_MODELS_PATH = "/root/workspace/DFS/aizynthfinder/models/USPTO"
 
 
 def _basic_molecule_route(smiles: str) -> list[Dict[str, Any]]:
@@ -51,7 +51,9 @@ def _basic_molecule_route(smiles: str) -> list[Dict[str, Any]]:
 def _resolve_config(az_model: str | None = None) -> str:
     """Resolve AiZynthFinder config path, falling back to ``AZ_MODEL_CONFIG_PATH``."""
     if az_model is not None:
-        config_path = f"{AZ_MODELS_PATH}/{az_model}/config.yml"
+        # config_path = f"{AZ_MODELS_PATH}/{az_model}/config.yml"
+        config_path = "/root/workspace/DFS/aizynthfinder/models/USPTO/config.yml"
+
         try:
             with open(config_path, "r") as _:
                 return config_path
