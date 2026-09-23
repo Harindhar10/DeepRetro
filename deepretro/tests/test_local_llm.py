@@ -144,3 +144,71 @@ def test_score_record_matches_notebook_metrics() -> None:
     assert summary["top1"]["n_all_correct"] == 1
     assert summary["topk"]["n_all_correct"] == 2
     assert "parse failures" in report
+
+
+def _mol(smiles: str, children: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    return {"type": "mol", "smiles": smiles, "children": children or []}
+
+
+def _route(product: str, reactants: list[str], deeper: dict[str, Any] | None = None) -> dict[str, Any]:
+    kids = [_mol(r) for r in reactants]
+    if deeper is not None:
+        kids[0] = deeper
+    return _mol(product, [{"type": "reaction", "children": kids}])
+
+
+def test_az_first_step_proposals_takes_only_the_first_reaction() -> None:
+    from deepretro.utils.one_step_eval import az_first_step_proposals
+
+    # Two-level route: only the top reaction's reactants are the single step.
+    deep = _route("CCOC(C)=O", ["OCC", "CC(=O)Cl"],
+                  deeper=_route("OCC", ["C=C", "O"]))
+    assert az_first_step_proposals([deep]) == [["OCC", "CC(=O)Cl"]]
+    # Same first step spelled differently in a second route: kept once.
+    same = _route("CCOC(C)=O", ["CC(=O)Cl", "CCO"])
+    other = _route("CCOC(C)=O", ["CCO", "CC(=O)O"])
+    assert az_first_step_proposals([deep, same, other]) == [
+        ["OCC", "CC(=O)Cl"], ["CCO", "CC(=O)O"],
+    ]
+    # Basic / in-stock target: no reaction, no step.
+    assert az_first_step_proposals([{"type": "mol", "smiles": "O", "in_stock": True}]) == []
+
+
+@pytest.mark.parametrize(
+    ("az_rec", "source"),
+    [
+        ({"solved": True, "proposals": [["CCO", "CC(=O)O"]]}, "az"),
+        ({"solved": False, "proposals": []}, "llm"),
+        ({"solved": False, "proposals": [], "error": "RuntimeError: boom"}, "llm"),
+        ({"solved": True, "proposals": []}, "llm"),  # solved but no first step
+    ],
+)
+def test_hybrid_view_uses_az_only_when_it_gives_a_first_step(
+    az_rec: dict[str, Any], source: str
+) -> None:
+    from deepretro.utils.one_step_eval import hybrid_views
+
+    base = {"mol_no": 0, "input": "CCOC(C)=O", "output": "CCO.CC(=O)O", "model_id": LOCAL_MODEL}
+    llm_rec = {"proposals": [["CCO"]]}
+    views = hybrid_views(az_rec, llm_rec, base)
+
+    assert views["hybrid"]["source"] == source
+    expected = az_rec["proposals"] if source == "az" else llm_rec["proposals"]
+    assert views["hybrid"]["proposals"] == expected
+    assert views["llm"]["proposals"] == [["CCO"]]
+    assert score_record(views["hybrid"])["all_correct"] == int(source == "az")
+
+
+def test_write_summary_logs_one_row_per_view(tmp_path: Any) -> None:
+    from deepretro.utils.one_step_eval import write_summary
+
+    base = {"mol_no": 0, "input": "CCOC(C)=O", "output": "CCO.CC(=O)O", "model_id": LOCAL_MODEL}
+    scored = pd.DataFrame([score_record({**base, "proposals": [["CCO", "CC(=O)O"]]})])
+    views = {v: summarize(scored, {"view": v})[0] for v in ("hybrid", "az", "llm")}
+    log = tmp_path / "all.csv"
+
+    write_summary({"views": views}, "report", str(tmp_path), str(log), views=views)
+
+    logged = pd.read_csv(log)
+    assert list(logged["view"]) == ["hybrid", "az", "llm"]
+    assert list(logged["top1_all_correct"]) == [100.0, 100.0, 100.0]

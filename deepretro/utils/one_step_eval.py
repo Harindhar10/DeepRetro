@@ -211,6 +211,142 @@ def score_record(rec: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
+def az_first_step_proposals(routes: Any) -> list[Pathway]:
+    """Return the reactants of the first reaction of each AiZynthFinder route.
+
+    AZ routes are trees (``mol`` -> ``reaction`` -> ``mol`` ...) that run all
+    the way to stock; the single-step answer is the first reaction's
+    reactants. Routes with no reaction (a basic or in-stock target) are
+    skipped, and duplicate first steps are kept once, in AZ's ranking order.
+
+    Parameters
+    ----------
+    routes : Sequence[dict]
+        Route dicts as returned by :func:`deepretro.utils.az.run_az`.
+
+    Returns
+    -------
+    list[Pathway]
+        One precursor list per distinct first step.
+
+    Examples
+    --------
+    >>> route = {"type": "mol", "smiles": "CCOC(C)=O", "children": [
+    ...     {"type": "reaction", "children": [
+    ...         {"type": "mol", "smiles": "OCC", "children": []},
+    ...         {"type": "mol", "smiles": "CC(=O)O", "children": []}]}]}
+    >>> az_first_step_proposals([route, route])
+    [['OCC', 'CC(=O)O']]
+    >>> az_first_step_proposals([{"type": "mol", "smiles": "O", "in_stock": True}])
+    []
+    """
+    proposals: list[Pathway] = []
+    seen: set[tuple[str, ...]] = set()
+    for route in routes or []:
+        if not isinstance(route, dict):
+            continue
+        reaction = next(
+            (c for c in route.get("children") or [] if c.get("type") == "reaction"),
+            None,
+        )
+        if reaction is None:
+            continue
+        reactants = [
+            c["smiles"]
+            for c in reaction.get("children") or []
+            if c.get("type") == "mol" and c.get("smiles")
+        ]
+        if not reactants:
+            continue
+        key = tuple(sorted(canon(s) or s for s in reactants))
+        if key not in seen:
+            seen.add(key)
+            proposals.append(reactants)
+    return proposals
+
+
+def run_az_record(mol_no: int, smiles: str, az_model: str) -> dict[str, Any]:
+    """Run an AiZynthFinder search for one molecule and summarize the result.
+
+    Top-level (not a closure) so it can run in a worker process. Any AZ
+    failure is caught and reported as an unsolved record with ``error`` set,
+    as :meth:`AutoSolver._run_az` does.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``mol_no``, ``solved``, ``n_routes``, ``proposals`` (first-step
+        reactants per distinct route), ``error`` and ``seconds``.
+    """
+    from deepretro.utils.az import run_az
+
+    started = time.time()
+    try:
+        solved, routes = run_az(smiles, az_model)
+        return {
+            "mol_no": mol_no,
+            "solved": bool(solved),
+            "n_routes": len(routes),
+            "proposals": az_first_step_proposals(routes) if solved else [],
+            "error": None,
+            "seconds": round(time.time() - started, 2),
+        }
+    except Exception as exc:  # AZ is external; one bad molecule must not stop the run
+        return {
+            "mol_no": mol_no,
+            "solved": False,
+            "n_routes": 0,
+            "proposals": [],
+            "error": f"{type(exc).__name__}: {exc}",
+            "seconds": round(time.time() - started, 2),
+        }
+
+
+def hybrid_views(
+    az_rec: dict[str, Any], llm_rec: dict[str, Any], base: dict[str, Any]
+) -> dict[str, dict[str, Any]]:
+    """Build the ``az``, ``llm`` and ``hybrid`` records for one molecule.
+
+    ``hybrid`` is what DeepRetro's :meth:`AutoSolver.single_step` would use:
+    AZ's first steps when AZ solved the target and produced a reaction,
+    otherwise the LLM's proposals. Each record is in the ``proposals`` shape
+    :func:`score_record` accepts.
+
+    Parameters
+    ----------
+    az_rec : dict[str, Any]
+        Output of :func:`run_az_record`.
+    llm_rec : dict[str, Any]
+        LLM record with ``proposals``.
+    base : dict[str, Any]
+        Shared fields: ``mol_no``, ``input``, ``output``, ``model_id``.
+
+    Examples
+    --------
+    >>> base = {"mol_no": 0, "input": "P", "output": "R", "model_id": "m"}
+    >>> az = {"solved": True, "proposals": [["A"]]}
+    >>> views = hybrid_views(az, {"proposals": [["B"]]}, base)
+    >>> views["hybrid"]["source"], views["hybrid"]["proposals"]
+    ('az', [['A']])
+    >>> hybrid_views({"solved": True, "proposals": []}, {"proposals": [["B"]]},
+    ...              base)["hybrid"]["source"]
+    'llm'
+    """
+    az_proposals = az_rec["proposals"] if az_rec.get("solved") else []
+    llm_proposals = llm_rec.get("proposals") or []
+    use_az = bool(az_proposals)
+    return {
+        "az": {**base, "proposals": az_proposals, "status": 200 if az_proposals else 504},
+        "llm": {**base, "proposals": llm_proposals, "status": 200 if llm_proposals else 504},
+        "hybrid": {
+            **base,
+            "proposals": az_proposals if use_az else llm_proposals,
+            "status": 200 if (az_proposals or llm_proposals) else 504,
+            "source": "az" if use_az else "llm",
+        },
+    }
+
+
 def _counts_and_pcts(all_c: pd.Series, any_c: pd.Series, maxfrag_c: pd.Series, n: int) -> dict[str, Any]:
     counts = {
         "n_all_correct": int(all_c.sum()),
@@ -275,22 +411,33 @@ def summarize(scored: pd.DataFrame, meta: dict[str, Any]) -> tuple[dict[str, Any
 
 
 def write_summary(
-    summary: dict[str, Any], report: str, out_dir: str, all_summaries_csv: str
+    summary: dict[str, Any],
+    report: str,
+    out_dir: str,
+    all_summaries_csv: str,
+    views: dict[str, dict[str, Any]] | None = None,
 ) -> None:
-    """Write ``summary.json``/``summary.txt`` and append a row to the cross-run log.
+    """Write ``summary.json``/``summary.txt`` and append rows to the cross-run log.
 
-    The cross-run CSV gets one flat row per scoring run; if the column set
-    changed since it was created, the file is rewritten so headers stay aligned.
+    Without ``views``, ``summary`` is one :func:`summarize` result and gets
+    one row in the cross-run CSV. With ``views`` (name -> :func:`summarize`
+    result), ``summary`` is the combined document written to JSON and each
+    view gets its own row, tagged with a ``view`` column. If the CSV's column
+    set changed since it was created, it is rewritten so headers stay aligned.
     """
     with open(os.path.join(out_dir, "summary.txt"), "w") as f:
         f.write(report + "\n")
     with open(os.path.join(out_dir, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
 
-    flat = {k: v for k, v in summary.items() if not isinstance(v, dict)}
-    flat.update({f"top1_{k}": v for k, v in summary["top1"].items()})
-    flat.update({f"topk_{k}": v for k, v in summary["topk"].items()})
-    row = pd.DataFrame([flat])
+    rows = []
+    for view, view_summary in (views or {None: summary}).items():
+        flat = {"view": view} if view else {}
+        flat.update({k: v for k, v in view_summary.items() if not isinstance(v, dict)})
+        flat.update({f"top1_{k}": v for k, v in view_summary["top1"].items()})
+        flat.update({f"topk_{k}": v for k, v in view_summary["topk"].items()})
+        rows.append(flat)
+    row = pd.DataFrame(rows)
     if os.path.exists(all_summaries_csv):
         prev = pd.read_csv(all_summaries_csv)
         if list(prev.columns) == list(row.columns):

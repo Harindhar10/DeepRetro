@@ -188,6 +188,18 @@ To benchmark single-step accuracy on USPTO-50k (top-1/top-k exact match and MaxF
 python scripts/eval_single_step_local.py --model hosted_vllm/zai-org/GLM-4.7-Flash --no-thinking
 ```
 
+To evaluate the model together with AiZynthFinder, as `AutoSolver.single_step` uses them (AZ first, LLM as fallback), add `--mode autosolve`:
+
+```bash
+python scripts/eval_single_step_local.py --model hosted_vllm/zai-org/GLM-4.7-Flash --no-thinking \
+    --mode autosolve --az-model USPTO --az-workers 4
+```
+
+- This needs `aizynthfinder` installed and `AZ_MODELS_PATH` (relative to the repo root) containing `<az-model>/config.yml`.
+- AZ's answer for a molecule is the first reaction of each route it finds.
+- AZ and the LLM both run on every molecule, and three views are scored: `hybrid` (AZ where it found a route, otherwise the LLM), `az` and `llm`. The report also gives AZ coverage and a head-to-head comparison on the molecules AZ answered.
+- The public USPTO templates come from USPTO data, so AZ may have seen these test reactions and its score here is likely inflated. For a fairer comparison, also run `--az-model Pistachio_100+`.
+
 ## Usage
 
 ### Web Interface
