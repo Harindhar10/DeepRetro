@@ -39,6 +39,8 @@ from deepretro.utils.variables import (
 logger = structlog.get_logger(__name__)
 
 MAX_API_RETRIES = 2
+THINK_START_TAG = "<think>"
+THINK_END_TAG = "</think>"
 PROMPT_CONFIG = {
     ("deepseek", "standard"): (SYS_PROMPT_DEEPSEEK, USER_PROMPT_DEEPSEEK, 16384),
     ("deepseek", "advanced"): (SYS_PROMPT_V4, USER_PROMPT_DEEPSEEK_V4, 16384),
@@ -462,6 +464,87 @@ class DeepSeekLLM(LLMInterface):
         return 200, thinking_steps, json_content
 
 
+class LocalLLM(LLMInterface):
+    """LLM interface for locally served models (vLLM via ``hosted_vllm/``).
+
+    Examples
+    --------
+    >>> LocalLLM("hosted_vllm/Qwen/Qwen3-8B").parse_response(
+    ...     '<think>draft <json>{"data": [["X"]]}</json></think><json>{"data": []}</json>'
+    ... )
+    (200, ['draft <json>{"data": [["X"]]}</json>'], '{"data": []}')
+    """
+
+    def parse_response(self, response_text: str) -> tuple[int, list[str], str]:
+        """Parse local-model output, ignoring anything inside the thinking block.
+
+        Thinking models often rehearse a ``<json>`` block while thinking, so
+        the payload is taken only from the text after the last ``</think>``.
+        This works whether or not the opening ``<think>`` is in the output
+        (some templates put it in the prompt) and when the server strips
+        thinking itself (``--reasoning-parser``), in which case there is no
+        ``</think>`` and the whole text is the answer.
+
+        Parameters
+        ----------
+        response_text : str
+            Raw model response text.
+
+        Returns
+        -------
+        tuple[int, list[str], str]
+            Status code, optional thinking steps, and JSON payload.
+
+        Examples
+        --------
+        >>> LocalLLM("hosted_vllm/Qwen/Qwen3-8B").parse_response(
+        ...     'x</think><json>{"data": []}</json>'
+        ... )
+        (200, ['x'], '{"data": []}')
+        >>> LocalLLM("hosted_vllm/Qwen/Qwen3-8B").parse_response("no payload")
+        (502, [], '')
+        """
+        thinking, answer = split_thinking(response_text)
+        json_content = extract_json_payload(answer)
+        if not json_content:
+            return 502, [], ""
+        thinking_steps = [thinking] if thinking else []
+        return 200, thinking_steps, json_content
+
+
+def split_thinking(response_text: str) -> tuple[str, str]:
+    """Split a response into thinking text and the answer after ``</think>``.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw model response text.
+
+    Returns
+    -------
+    tuple[str, str]
+        Thinking text (without ``<think>`` tags) and the answer. With no
+        thinking tags the whole text is the answer; a ``<think>`` that never
+        closes (cut off by the token cap) is all thinking and no answer.
+
+    Examples
+    --------
+    >>> split_thinking("<think>a</think>b")
+    ('a', 'b')
+    >>> split_thinking("b")
+    ('', 'b')
+    >>> split_thinking("<think>a")
+    ('a', '')
+    """
+    end = response_text.rfind(THINK_END_TAG)
+    if end == -1:
+        if THINK_START_TAG in response_text:
+            return response_text.replace(THINK_START_TAG, "", 1).strip(), ""
+        return "", response_text
+    thinking = response_text[:end].replace(THINK_START_TAG, "", 1).strip()
+    return thinking, response_text[end + len(THINK_END_TAG) :]
+
+
 def parse_cot_response(response_text: str) -> tuple[int, list[str], str]:
     """Parse Claude-style ``<cot>`` output with a JSON payload.
 
@@ -528,8 +611,12 @@ def create_llm_interface(
     --------
     >>> type(create_llm_interface("openai/gpt-4o-mini")).__name__
     'OpenAILLM'
+    >>> type(create_llm_interface("hosted_vllm/zai-org/GLM-4.7-Flash")).__name__
+    'LocalLLM'
     """
     selection: ModelSelection = resolve_model_selection(model, prompt_mode=prompt_mode)
+    if selection.provider == "local":
+        return LocalLLM(model, prompt_mode=prompt_mode)
     if selection.provider == "openai":
         return OpenAILLM(model, prompt_mode=prompt_mode)
     if selection.provider == "deepseek":

@@ -10,6 +10,7 @@ public pipeline stays focused on the retrosynthesis workflow.
 from __future__ import annotations
 
 import ast
+import json
 from typing import Any, cast
 
 import litellm
@@ -376,6 +377,32 @@ def split_json_master(response_text: str, model: str) -> tuple[int, list[str], s
     return parse_response(response_text, model)
 
 
+def load_json_lenient(json_content: str) -> Any:
+    """Parse strict JSON, falling back to a Python literal.
+
+    Parameters
+    ----------
+    json_content : str
+        JSON or Python-literal text.
+
+    Returns
+    -------
+    Any
+        Parsed value.
+
+    Examples
+    --------
+    >>> load_json_lenient('{"ok": true}')
+    {'ok': True}
+    >>> load_json_lenient("{'ok': True}")
+    {'ok': True}
+    """
+    try:
+        return json.loads(json_content)
+    except ValueError:
+        return ast.literal_eval(json_content)
+
+
 def validate_split_json(
     json_content: str,
 ) -> tuple[int, list[Pathway], list[str], list[float]]:
@@ -398,10 +425,21 @@ def validate_split_json(
     ...     '{"data": [["CCO"]], "explanation": ["demo"], "confidence_scores": [1]}'
     ... )
     (200, [['CCO']], ['demo'], [1.0])
+
+    Strict JSON (``true``/``null``) and a flat list of SMILES, both common
+    from small local models, are accepted; a flat list is one pathway.
+
+    >>> validate_split_json(
+    ...     '{"data": ["CCO", "CC"], "explanation": ["demo"], '
+    ...     '"confidence_scores": [0.5], "valid": true}'
+    ... )
+    (200, [['CCO', 'CC']], ['demo'], [0.5])
     """
     try:
-        result = cast(dict[str, Any], ast.literal_eval(json_content))
+        result = cast(dict[str, Any], load_json_lenient(json_content))
         pathways = cast(list[Pathway], result["data"])
+        if pathways and all(isinstance(item, str) for item in pathways):
+            pathways = [cast(Pathway, pathways)]
         explanations = cast(list[str], result["explanation"])
         confidence = [float(value) for value in result["confidence_scores"]]
         return 200, pathways, explanations, confidence

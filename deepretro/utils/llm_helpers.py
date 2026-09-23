@@ -11,7 +11,7 @@ from deepretro.utils.variables import DEEPSEEK_MODELS, OPENAI_MODELS
 
 PromptMode = Literal["standard", "advanced"]
 ModelFamily = Literal["deepseek", "openai", "default"]
-ProviderName = Literal["anthropic", "openai", "deepseek"]
+ProviderName = Literal["anthropic", "openai", "deepseek", "local"]
 ThinkingEffort = Literal["low", "medium", "high", "max"]
 OutputTokenParam = Literal["max_tokens", "max_completion_tokens"]
 
@@ -98,6 +98,23 @@ Pathway = list[str]
 
 MIN_REASONING_OUTPUT_TOKENS = 8192
 PREFERRED_DEEPSEEK_MODEL = "fireworks_ai/accounts/fireworks/models/deepseek-r1"
+
+# Locally served models (vLLM's OpenAI-compatible server) are reached through
+# LiteLLM's ``hosted_vllm/`` provider. The server address and key come from the
+# same env vars LiteLLM reads, with defaults for a stock ``vllm serve``.
+LOCAL_MODEL_PREFIXES = ("hosted_vllm/",)
+LOCAL_API_BASE_ENV_VAR = "HOSTED_VLLM_API_BASE"
+LOCAL_API_KEY_ENV_VAR = "HOSTED_VLLM_API_KEY"
+DEFAULT_LOCAL_API_BASE = "http://localhost:8000/v1"
+DEFAULT_LOCAL_API_KEY = "EMPTY"
+# The model emits ``<json>...</json>``; stop at the closing tag instead of
+# rambling to the token cap, and keep the tag so the parser can find it.
+LOCAL_STOP_SEQUENCES = ["</json>"]
+# Qwen's recommended thinking-mode sampling: greedy decoding while thinking
+# causes endless repetition.
+LOCAL_THINKING_MIN_TEMPERATURE = 0.6
+LOCAL_THINKING_TOP_P = 0.95
+LOCAL_THINKING_TOP_K = 20
 
 
 @dataclass(frozen=True)
@@ -188,6 +205,29 @@ def strip_provider_prefix(model: str) -> str:
     if separator and provider in {"openai", "anthropic"}:
         return remainder
     return model
+
+
+def looks_like_local_model(model: str) -> bool:
+    """Return whether a model identifier refers to a locally served model.
+
+    Parameters
+    ----------
+    model : str
+        Model identifier to inspect.
+
+    Returns
+    -------
+    bool
+        ``True`` for ``hosted_vllm/`` model identifiers.
+
+    Examples
+    --------
+    >>> looks_like_local_model("hosted_vllm/zai-org/GLM-4.7-Flash")
+    True
+    >>> looks_like_local_model("openai/gpt-4o-mini")
+    False
+    """
+    return model.lower().startswith(LOCAL_MODEL_PREFIXES)
 
 
 def looks_like_openai_model(model: str) -> bool:
@@ -293,8 +333,14 @@ def infer_provider(model: str) -> ProviderName:
     'openai'
     >>> infer_provider("claude-opus-4-6")
     'anthropic'
+    >>> infer_provider("hosted_vllm/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B")
+    'local'
     """
     lower_model = model.lower()
+    # Checked first: a local model name may contain "deepseek" or "gpt-" and
+    # must not be rerouted to a hosted provider.
+    if looks_like_local_model(model):
+        return "local"
     if model in DEEPSEEK_MODELS or "deepseek" in lower_model:
         return "deepseek"
     if model in OPENAI_MODELS or lower_model.startswith("openai/"):
@@ -365,6 +411,9 @@ def resolve_model_selection(
     >>> selection = resolve_model_selection("openai/gpt-4o-mini:adv")
     >>> (selection.provider, selection.prompt_mode)
     ('openai', 'advanced')
+    >>> selection = resolve_model_selection("hosted_vllm/zai-org/GLM-4.7-Flash")
+    >>> (selection.provider, selection.family, selection.output_token_param)
+    ('local', 'openai', 'max_tokens')
     """
     completion_model, suffix_prompt_mode = split_prompt_mode(model)
     provider = infer_provider(completion_model)
@@ -373,7 +422,8 @@ def resolve_model_selection(
 
     if provider == "deepseek":
         family: ModelFamily = "deepseek"
-    elif provider == "openai":
+    elif provider in {"openai", "local"}:
+        # Local instruct models use the non-CoT OpenAI prompt pair.
         family = "openai"
     else:
         family = "default"
@@ -395,7 +445,7 @@ def resolve_model_selection(
             "max_completion_tokens" if provider == "openai" else "max_tokens"
         ),
         supports_reasoning_effort=is_openai_reasoning or is_anthropic_reasoning,
-        supports_seed=(provider == "openai") and not is_openai_reasoning,
+        supports_seed=(provider in {"openai", "local"}) and not is_openai_reasoning,
         requires_temperature_one=is_openai_reasoning or is_anthropic_reasoning,
     )
 
@@ -658,6 +708,14 @@ def build_completion_params(
     >>> params = build_completion_params("anthropic/claude-sonnet-4-6", messages, 16, 0.2)
     >>> (params["max_tokens"], params["temperature"], params["reasoning_effort"])
     (8192, 1, 'medium')
+    >>> params = build_completion_params(
+    ...     "hosted_vllm/zai-org/GLM-4.7-Flash", messages, 1024, 0.0,
+    ...     enable_thinking=False,
+    ... )
+    >>> (params["temperature"], params["extra_body"]["chat_template_kwargs"])
+    (0.0, {'enable_thinking': False})
+    >>> "reasoning_effort" in params
+    False
     """
     selection = resolve_model_selection(model)
     output_token_limit = resolve_output_token_limit(
@@ -685,8 +743,56 @@ def build_completion_params(
         params["metadata"] = metadata
     if enable_thinking and selection.supports_reasoning_effort:
         params["reasoning_effort"] = thinking_effort
+    if selection.provider == "local":
+        params.update(build_local_params(temperature, enable_thinking))
 
     return params
+
+
+def build_local_params(temperature: float, enable_thinking: bool) -> dict[str, Any]:
+    """Return the extra ``litellm.completion`` arguments for a local vLLM server.
+
+    ``chat_template_kwargs`` carries the chat template's thinking switch
+    (Qwen3/GLM honor it, other templates ignore it). ``stop`` and
+    ``include_stop_str_in_output`` are vLLM sampling parameters passed through
+    ``extra_body``. With thinking on, sampling follows Qwen's recommendation,
+    so the temperature is raised to at least
+    :data:`LOCAL_THINKING_MIN_TEMPERATURE`.
+
+    Parameters
+    ----------
+    temperature : float
+        Requested sampling temperature.
+    enable_thinking : bool
+        Whether the chat template should open a thinking block.
+
+    Returns
+    -------
+    dict[str, Any]
+        Keyword arguments merged into the completion parameters.
+
+    Examples
+    --------
+    >>> params = build_local_params(0.0, enable_thinking=True)
+    >>> (params["temperature"], params["extra_body"]["top_k"])
+    (0.6, 20)
+    >>> build_local_params(0.2, enable_thinking=False)["temperature"]
+    0.2
+    """
+    extra_body: dict[str, Any] = {
+        "chat_template_kwargs": {"enable_thinking": enable_thinking},
+        "stop": list(LOCAL_STOP_SEQUENCES),
+        "include_stop_str_in_output": True,
+    }
+    if enable_thinking:
+        temperature = max(temperature, LOCAL_THINKING_MIN_TEMPERATURE)
+        extra_body.update(top_p=LOCAL_THINKING_TOP_P, top_k=LOCAL_THINKING_TOP_K)
+    return {
+        "api_base": os.getenv(LOCAL_API_BASE_ENV_VAR, DEFAULT_LOCAL_API_BASE),
+        "api_key": os.getenv(LOCAL_API_KEY_ENV_VAR, DEFAULT_LOCAL_API_KEY),
+        "temperature": temperature,
+        "extra_body": extra_body,
+    }
 
 
 def coerce_response_text(content: Any) -> str:

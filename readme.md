@@ -166,6 +166,28 @@ python -m http.server 8000
 2. Enter your API key when prompted
 3. Start analyzing molecules!
 
+### Local models (vLLM)
+
+Any open-weights model served by vLLM's OpenAI-compatible server can replace a hosted provider. Serve it from its own environment (vLLM pins its own torch/transformers):
+
+```bash
+VLLM_USE_FLASHINFER_SAMPLER=0 vllm serve zai-org/GLM-4.7-Flash \
+    --dtype bfloat16 --max-model-len 17408 --enable-prefix-caching \
+    --gpu-memory-utilization 0.85
+```
+
+Then pass the model as `hosted_vllm/<model-id>` anywhere a model is accepted, e.g. `llm_pipeline(smiles, model="hosted_vllm/zai-org/GLM-4.7-Flash")`. The server address comes from `HOSTED_VLLM_API_BASE` (default `http://localhost:8000/v1`). The frontend's `http.server` also uses port 8000, so if you run both, start vLLM with `--port 8001` and set `HOSTED_VLLM_API_BASE` to match.
+
+- Local models use the non-CoT OpenAI prompt pair and never fall back to a hosted model.
+- `enable_thinking` is sent as the chat template's `enable_thinking` switch (Qwen3, GLM). With thinking on, sampling uses temperature ≥ 0.6, top_p 0.95, top_k 20.
+- `--max-model-len` must cover the prompt (~600 tokens) plus `max_output_tokens`. The default of 16384 output tokens needs about 17k.
+
+To benchmark single-step accuracy on USPTO-50k (top-1/top-k exact match and MaxFrag):
+
+```bash
+python scripts/eval_single_step_local.py --model hosted_vllm/zai-org/GLM-4.7-Flash --no-thinking
+```
+
 ## Usage
 
 ### Web Interface
