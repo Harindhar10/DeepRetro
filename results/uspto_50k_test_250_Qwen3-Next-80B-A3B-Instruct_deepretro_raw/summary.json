@@ -1,0 +1,30 @@
+{
+  "run": "uspto_50k_test_250_Qwen3-Next-80B-A3B-Instruct_deepretro_raw",
+  "model_id": "hosted_vllm/Qwen/Qwen3-Next-80B-A3B-Instruct",
+  "mode": "raw",
+  "thinking": false,
+  "max_new_tokens": 1024,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_total": 250,
+  "n_scored": 250,
+  "timestamp": "2026-09-25T13:26:45",
+  "top1": {
+    "all_correct": 1.6,
+    "any_correct": 8.4,
+    "maxfrag": 4.0,
+    "n_all_correct": 4,
+    "n_any_correct": 21,
+    "n_maxfrag": 10
+  },
+  "topk": {
+    "all_correct": 4.4,
+    "any_correct": 13.2,
+    "maxfrag": 7.6,
+    "n_all_correct": 11,
+    "n_any_correct": 33,
+    "n_maxfrag": 19
+  },
+  "parse_failures_pct": 2.8,
+  "invalid_smiles_pct": 67.2,
+  "mean_proposals": 4.7
+}

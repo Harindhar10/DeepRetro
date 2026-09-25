@@ -1,0 +1,19 @@
+model: hosted_vllm/Qwen/Qwen3-Next-80B-A3B-Instruct  mode: raw
+scored 10 molecules
+
+=== top-1 (first proposal) ===
+All correct % 0.00  (0/10)
+Any correct % 0.00  (0/10)
+MaxFrag     % 0.00  (0/10)
+
+=== top-k (best proposal) ===
+All correct % 0.00  (0/10)
+Any correct % 0.00  (0/10)
+MaxFrag     % 0.00  (0/10)
+
+=== response quality ===
+parse failures  : 0.00%
+invalid SMILES  : 80.00%
+mean proposals  : 4.90
+
+Denominator is all 10 scored rows -- parse failures count as incorrect.
