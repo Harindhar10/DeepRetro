@@ -54,8 +54,8 @@ if str(_REPO_ROOT) not in sys.path:
 # Hardcoded AZ model paths, relative to the repo root (deepretro.utils.az
 # prefixes them with it). Set before any deepretro import, and via the
 # environment so the spawned AZ workers inherit them.
-os.environ["AZ_MODELS_PATH"] = "../aizynthfinder/models"
-os.environ["AZ_MODEL_CONFIG_PATH"] = "../aizynthfinder/models/USPTO/config.yml"
+os.environ["AZ_MODELS_PATH"] = "aizynthfinder/models"
+os.environ["AZ_MODEL_CONFIG_PATH"] = "aizynthfinder/models/USPTO/config.yml"
 
 import pandas as pd  # noqa: E402
 
@@ -318,7 +318,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit", type=int, default=None, help="evaluate the first N molecules")
     parser.add_argument("--stability-check", action="store_true", help="pipeline/autosolve modes")
     parser.add_argument("--hallucination-check", action="store_true", help="pipeline/autosolve modes")
-    parser.add_argument("--out-root", default=str(_REPO_ROOT / "results_new"))
+    parser.add_argument("--out-root", default=str(_REPO_ROOT / "results"))
     return parser
 
 

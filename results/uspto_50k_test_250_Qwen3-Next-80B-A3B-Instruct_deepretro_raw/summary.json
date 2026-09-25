@@ -7,7 +7,7 @@
   "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
   "n_total": 250,
   "n_scored": 250,
-  "timestamp": "2026-09-25T13:26:45",
+  "timestamp": "2026-09-25T14:29:31",
   "top1": {
     "all_correct": 1.6,
     "any_correct": 8.4,
