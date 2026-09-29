@@ -92,7 +92,7 @@ def obtain_prompt(LLM: str):
         advanced_prompt = True
     print(f"Advanced Prompt: {advanced_prompt}")
     if advanced_prompt:
-        if LLM in DEEPSEEK_MODELS:
+        if LLM in DEEPSEEK_MODELS or "deepseek-1" in LLM.split("/")[0].lower():
             sys_prompt_final = SYS_PROMPT_V4
             user_prompt_final = USER_PROMPT_DEEPSEEK_V4
             max_completion_tokens = 8192 * 2
@@ -105,7 +105,7 @@ def obtain_prompt(LLM: str):
             user_prompt_final = USER_PROMPT_V4
             max_completion_tokens = 4096
     else:
-        if LLM in DEEPSEEK_MODELS:
+        if LLM in DEEPSEEK_MODELS or "deepseek-1" in LLM.split("/")[0].lower():
             sys_prompt_final = SYS_PROMPT_DEEPSEEK
             user_prompt_final = USER_PROMPT_DEEPSEEK
             max_completion_tokens = 8192 * 2
@@ -125,7 +125,8 @@ def call_LLM(molecule: str,
              LLM: str = "claude-opus-4-8",
              temperature: float = 0.0,
              messages: Optional[list[dict]] = None,
-             use_protecting_group_feature: bool = False) -> tuple[int, str]:
+             use_protecting_group_feature: bool = False,
+             local: bool = False) -> tuple[int, str]:
     """Calls the LLM model to predict the next step
 
     Parameters
@@ -215,6 +216,28 @@ def call_LLM(molecule: str,
         }]
     params["messages"] = messages
 
+
+    if local:
+        params["user_prompt"] = user_prompt_final
+        params["sys_prompt"] = sys_prompt_final
+
+
+
+    if local:
+        from src.utils.vllm import generate 
+
+        response = generate(
+            model_name=params["model"],
+            smiles=molecule,
+            user_prompt=user_prompt_final,
+            top_p=params["top_p"],
+            max_tokens=params["max_completion_tokens"],
+            SYS_PROMPT=sys_prompt_final,
+            temperature=params["temperature"],
+        )
+
+        return 200, response
+
     try:
         # Call the LLM model
         response = completion(**params)
@@ -233,6 +256,47 @@ def call_LLM(molecule: str,
     log_message(f"Received response from LLM: {res_text}", logger)
     return 200, res_text
 
+
+
+def strip_thinking(res_text: str) -> str:
+    """Drop the reasoning block so the parser only sees the answer."""
+    _THINK_END = "</think>"
+    i = res_text.rfind(_THINK_END)
+    return res_text[i + len(_THINK_END) :] if i != -1 else res_text
+
+
+def split_json_content(res_text: str):
+
+    
+    """Return (status, json_content). 200 on success, 502 on failure."""
+    res_text = strip_thinking(res_text)
+
+    # 1. Match explicit <json>...</json> tags
+    start = res_text.find("<json>")
+    end = res_text.find("</json>")
+    if start != -1 and end != -1 and end > start:
+        content = res_text[start + len("<json>") : end].strip()
+        if content:
+            return 200, content
+
+    # 2. Match standard ```json ... ``` markdown blocks
+    if "```json" in res_text:
+        s = res_text.find("```json") + len("```json")
+        e = res_text.find("```", s)
+        if e != -1:
+            content = res_text[s:e].strip()
+            if content:
+                return 200, content
+
+    # 3. Non-greedy JSON salvage: find outer braces { ... }
+    first_brace = res_text.find("{")
+    last_brace = res_text.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        content = res_text[first_brace : last_brace + 1].strip()
+        if content:
+            return 200, content
+
+    return 502, ""
 
 def split_cot_json(res_text: str) -> tuple[int, list[str], str]:
     """Parse the LLM response to extract the thinking steps and json content
@@ -353,15 +417,19 @@ def split_json_master(res_text: str, model: str) -> tuple[int, list[str], str]:
         The status code, thinking steps and json content
     """
     try:
-        if model in DEEPSEEK_MODELS:
+        if model in DEEPSEEK_MODELS or "deepseek-1" in model.split("/")[0].lower():
             status_code, thinking_steps, json_content = split_json_deepseek(
                 res_text)
         elif model in OPENAI_MODELS:
             status_code, json_content = split_json_openAI(res_text)
             thinking_steps = []
+
+            
         else:
-            status_code, thinking_steps, json_content = split_cot_json(
+            status_code, json_content = split_json_content(
                 res_text)
+            thinking_steps = []
+            
     except Exception as e:
         return 505, [], ""
 
@@ -400,7 +468,8 @@ def llm_pipeline(
     messages: Optional[list[dict]] = None,
     stability_flag: str = "False",
     hallucination_check: str = "False",
-    use_protecting_group_feature: bool = False
+    use_protecting_group_feature: bool = False,
+    local : bool = False
 ) -> tuple[list[list[str]], list[str], list[float]]:
     """Pipeline to call LLM and validate the results
 
@@ -444,10 +513,11 @@ def llm_pipeline(
             current_model,
             messages=messages,
             temperature=run,
-            use_protecting_group_feature=use_protecting_group_feature)
+            use_protecting_group_feature=use_protecting_group_feature,
+            local=local)
         if status_code != 200:
             log_message(f"Error in calling LLM: {res_text}", logger)
-            run += 0.1
+            run += 1
             get_error_log(status_code)
             continue
 
@@ -457,7 +527,7 @@ def llm_pipeline(
             res_text, current_model)
         if status_code != 200:
             log_message(f"Error in splitting cot json: {res_text}", logger)
-            run += 0.1
+            run += 1
             get_error_log(status_code)
             continue
 
@@ -468,7 +538,7 @@ def llm_pipeline(
         if status_code != 200:
             log_message(f"Error in validating split json content: {res_text}",
                         logger)
-            run += 0.1
+            run += 1
             get_error_log(status_code)
             continue
 
