@@ -517,7 +517,7 @@ def llm_pipeline(
             local=local)
         if status_code != 200:
             log_message(f"Error in calling LLM: {res_text}", logger)
-            run += 1
+            run += 0.1
             get_error_log(status_code)
             continue
 
@@ -527,7 +527,7 @@ def llm_pipeline(
             res_text, current_model)
         if status_code != 200:
             log_message(f"Error in splitting cot json: {res_text}", logger)
-            run += 1
+            run += 0.1
             get_error_log(status_code)
             continue
 
@@ -538,7 +538,7 @@ def llm_pipeline(
         if status_code != 200:
             log_message(f"Error in validating split json content: {res_text}",
                         logger)
-            run += 1
+            run += 0.1
             get_error_log(status_code)
             continue
 
