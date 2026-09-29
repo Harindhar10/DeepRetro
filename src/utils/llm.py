@@ -92,7 +92,7 @@ def obtain_prompt(LLM: str):
         advanced_prompt = True
     print(f"Advanced Prompt: {advanced_prompt}")
     if advanced_prompt:
-        if LLM in DEEPSEEK_MODELS or "deepseek-1" in LLM.split("/")[0].lower():
+        if LLM in DEEPSEEK_MODELS or "deepseek-ai" in LLM.split("/")[0].lower():
             sys_prompt_final = SYS_PROMPT_V4
             user_prompt_final = USER_PROMPT_DEEPSEEK_V4
             max_completion_tokens = 8192 * 2
@@ -105,7 +105,7 @@ def obtain_prompt(LLM: str):
             user_prompt_final = USER_PROMPT_V4
             max_completion_tokens = 4096
     else:
-        if LLM in DEEPSEEK_MODELS or "deepseek-1" in LLM.split("/")[0].lower():
+        if LLM in DEEPSEEK_MODELS or "deepseek-ai" in LLM.split("/")[0].lower():
             sys_prompt_final = SYS_PROMPT_DEEPSEEK
             user_prompt_final = USER_PROMPT_DEEPSEEK
             max_completion_tokens = 8192 * 2
