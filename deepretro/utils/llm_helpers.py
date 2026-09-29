@@ -713,7 +713,7 @@ def build_completion_params(
     ...     enable_thinking=False,
     ... )
     >>> (params["temperature"], params["extra_body"]["chat_template_kwargs"])
-    (0.0, {'enable_thinking': False})
+    (0.0, {'enable_thinking': False, 'thinking': False})
     >>> "reasoning_effort" in params
     False
     """
@@ -752,8 +752,9 @@ def build_completion_params(
 def build_local_params(temperature: float, enable_thinking: bool) -> dict[str, Any]:
     """Return the extra ``litellm.completion`` arguments for a local vLLM server.
 
-    ``chat_template_kwargs`` carries the chat template's thinking switch
-    (Qwen3/GLM honor it, other templates ignore it). ``stop`` and
+    ``chat_template_kwargs`` carries the chat template's thinking switch under
+    both names in use (Qwen3/GLM read ``enable_thinking``, DeepSeek V4 reads
+    ``thinking``; templates ignore keys they don't use). ``stop`` and
     ``include_stop_str_in_output`` are vLLM sampling parameters passed through
     ``extra_body``. With thinking on, sampling follows Qwen's recommendation,
     so the temperature is raised to at least
@@ -780,7 +781,7 @@ def build_local_params(temperature: float, enable_thinking: bool) -> dict[str, A
     0.2
     """
     extra_body: dict[str, Any] = {
-        "chat_template_kwargs": {"enable_thinking": enable_thinking},
+        "chat_template_kwargs": {"enable_thinking": enable_thinking, "thinking": enable_thinking},
         "stop": list(LOCAL_STOP_SEQUENCES),
         "include_stop_str_in_output": True,
     }
