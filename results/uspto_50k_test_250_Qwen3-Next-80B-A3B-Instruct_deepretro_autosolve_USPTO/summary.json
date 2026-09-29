@@ -1,0 +1,131 @@
+{
+  "run": "uspto_50k_test_250_Qwen3-Next-80B-A3B-Instruct_deepretro_autosolve_USPTO",
+  "model_id": "hosted_vllm/Qwen/Qwen3-Next-80B-A3B-Instruct",
+  "mode": "autosolve",
+  "thinking": false,
+  "max_new_tokens": 1024,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_total": 250,
+  "az_model": "USPTO",
+  "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
+  "n_scored": 250,
+  "coverage": {
+    "az_solved_pct": 66.0,
+    "az_answered_pct": 64.0,
+    "az_errors": 0,
+    "az_mean_seconds": 10.8536
+  },
+  "az_answered_subset": {
+    "az": {
+      "top1_all_correct": 36.875,
+      "topk_all_correct": 54.37499999999999,
+      "top1_maxfrag": 41.25
+    },
+    "llm": {
+      "top1_all_correct": 3.75,
+      "topk_all_correct": 8.75,
+      "top1_maxfrag": 6.875000000000001
+    }
+  },
+  "views": {
+    "hybrid": {
+      "run": "uspto_50k_test_250_Qwen3-Next-80B-A3B-Instruct_deepretro_autosolve_USPTO",
+      "model_id": "hosted_vllm/Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "mode": "autosolve",
+      "thinking": false,
+      "max_new_tokens": 1024,
+      "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+      "n_total": 250,
+      "az_model": "USPTO",
+      "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
+      "view": "hybrid",
+      "n_scored": 250,
+      "timestamp": "2026-09-25T15:06:02",
+      "top1": {
+        "all_correct": 24.0,
+        "any_correct": 33.6,
+        "maxfrag": 28.8,
+        "n_all_correct": 60,
+        "n_any_correct": 84,
+        "n_maxfrag": 72
+      },
+      "topk": {
+        "all_correct": 36.4,
+        "any_correct": 50.4,
+        "maxfrag": 43.2,
+        "n_all_correct": 91,
+        "n_any_correct": 126,
+        "n_maxfrag": 108
+      },
+      "parse_failures_pct": 7.2,
+      "invalid_smiles_pct": 0.0,
+      "mean_proposals": 4.216
+    },
+    "az": {
+      "run": "uspto_50k_test_250_Qwen3-Next-80B-A3B-Instruct_deepretro_autosolve_USPTO",
+      "model_id": "hosted_vllm/Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "mode": "autosolve",
+      "thinking": false,
+      "max_new_tokens": 1024,
+      "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+      "n_total": 250,
+      "az_model": "USPTO",
+      "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
+      "view": "az",
+      "n_scored": 250,
+      "timestamp": "2026-09-25T15:06:02",
+      "top1": {
+        "all_correct": 23.6,
+        "any_correct": 30.4,
+        "maxfrag": 26.4,
+        "n_all_correct": 59,
+        "n_any_correct": 76,
+        "n_maxfrag": 66
+      },
+      "topk": {
+        "all_correct": 34.8,
+        "any_correct": 44.4,
+        "maxfrag": 39.6,
+        "n_all_correct": 87,
+        "n_any_correct": 111,
+        "n_maxfrag": 99
+      },
+      "parse_failures_pct": 36.0,
+      "invalid_smiles_pct": 0.0,
+      "mean_proposals": 3.3
+    },
+    "llm": {
+      "run": "uspto_50k_test_250_Qwen3-Next-80B-A3B-Instruct_deepretro_autosolve_USPTO",
+      "model_id": "hosted_vllm/Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "mode": "autosolve",
+      "thinking": false,
+      "max_new_tokens": 1024,
+      "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+      "n_total": 250,
+      "az_model": "USPTO",
+      "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
+      "view": "llm",
+      "n_scored": 250,
+      "timestamp": "2026-09-25T15:06:02",
+      "top1": {
+        "all_correct": 2.8,
+        "any_correct": 10.4,
+        "maxfrag": 6.8,
+        "n_all_correct": 7,
+        "n_any_correct": 26,
+        "n_maxfrag": 17
+      },
+      "topk": {
+        "all_correct": 7.2,
+        "any_correct": 15.6,
+        "maxfrag": 10.8,
+        "n_all_correct": 18,
+        "n_any_correct": 39,
+        "n_maxfrag": 27
+      },
+      "parse_failures_pct": 15.2,
+      "invalid_smiles_pct": 0.0,
+      "mean_proposals": 2.636
+    }
+  }
+}

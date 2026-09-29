@@ -53,6 +53,12 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+# Hardcoded AZ model paths, relative to the repo root (deepretro.utils.az
+# prefixes them with it). Set before any deepretro import, and via the
+# environment so the spawned AZ workers inherit them.
+os.environ["AZ_MODELS_PATH"] = "aizynthfinder/models"
+os.environ["AZ_MODEL_CONFIG_PATH"] = "aizynthfinder/models/USPTO/config.yml"
+
 import pandas as pd  # noqa: E402
 
 from deepretro.utils.llm import call_LLM, llm_pipeline  # noqa: E402
@@ -76,7 +82,7 @@ def generate_one(args: argparse.Namespace, smiles: str) -> dict[str, Any]:
         status, text = call_LLM(
             smiles,
             model=args.model,
-            temperature=0.0,
+            temperature=1.0,
             enable_thinking=args.thinking,
             max_output_tokens=args.max_output_tokens,
         )
@@ -155,7 +161,7 @@ def resolve_az_config(az_model: str) -> str:
               f"AZ_MODEL_CONFIG_PATH={az.AZ_MODEL_CONFIG_PATH}")
         return az.AZ_MODEL_CONFIG_PATH
     sys.exit(f"No AZ config: neither {wanted} nor AZ_MODEL_CONFIG_PATH="
-             f"{az.AZ_MODEL_CONFIG_PATH} exists. Set AZ_MODELS_PATH (relative to the repo root).")
+             f"{az.AZ_MODEL_CONFIG_PATH} exists. Fix the hardcoded AZ paths at the top of this script.")
 
 
 def run_llm_step(args: argparse.Namespace, df: pd.DataFrame, jsonl: str) -> None:

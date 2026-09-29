@@ -1,0 +1,66 @@
+model: hosted_vllm/Qwen/Qwen3-32B   az_model: USPTO   scored 250 molecules
+AZ solved 66.4%, answered (has a first step) 64.4%, 0 AZ errors, 4.1 s/molecule
+On the 161 molecules AZ answered -- top-1 all_correct: AZ 36.6% vs LLM 0.0%
+
+##### view: hybrid #####
+model: hosted_vllm/Qwen/Qwen3-32B  mode: autosolve
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 24.00  (60/250)
+Any correct % 32.00  (80/250)
+MaxFrag     % 26.80  (67/250)
+
+=== top-k (best proposal) ===
+All correct % 36.00  (90/250)
+Any correct % 47.20  (118/250)
+MaxFrag     % 41.60  (104/250)
+
+=== response quality ===
+parse failures  : 4.40%
+invalid SMILES  : 0.00%
+mean proposals  : 4.22
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.
+
+##### view: az #####
+model: hosted_vllm/Qwen/Qwen3-32B  mode: autosolve
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 23.60  (59/250)
+Any correct % 30.00  (75/250)
+MaxFrag     % 26.00  (65/250)
+
+=== top-k (best proposal) ===
+All correct % 35.20  (88/250)
+Any correct % 44.40  (111/250)
+MaxFrag     % 39.60  (99/250)
+
+=== response quality ===
+parse failures  : 35.60%
+invalid SMILES  : 0.00%
+mean proposals  : 3.31
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.
+
+##### view: llm #####
+model: hosted_vllm/Qwen/Qwen3-32B  mode: autosolve
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 0.40  (1/250)
+Any correct % 5.20  (13/250)
+MaxFrag     % 2.00  (5/250)
+
+=== top-k (best proposal) ===
+All correct % 0.80  (2/250)
+Any correct % 8.80  (22/250)
+MaxFrag     % 4.40  (11/250)
+
+=== response quality ===
+parse failures  : 9.60%
+invalid SMILES  : 0.00%
+mean proposals  : 2.71
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.

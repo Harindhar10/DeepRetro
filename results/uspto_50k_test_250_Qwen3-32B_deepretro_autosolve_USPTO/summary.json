@@ -1,0 +1,131 @@
+{
+  "run": "uspto_50k_test_250_Qwen3-32B_deepretro_autosolve_USPTO",
+  "model_id": "hosted_vllm/Qwen/Qwen3-32B",
+  "mode": "autosolve",
+  "thinking": false,
+  "max_new_tokens": 1024,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_total": 250,
+  "az_model": "USPTO",
+  "az_config": "/root/workspace/DFS/DeepRetro/../aizynthfinder/models/USPTO/config.yml",
+  "n_scored": 250,
+  "coverage": {
+    "az_solved_pct": 66.4,
+    "az_answered_pct": 64.4,
+    "az_errors": 0,
+    "az_mean_seconds": 4.09412
+  },
+  "az_answered_subset": {
+    "az": {
+      "top1_all_correct": 36.64596273291926,
+      "topk_all_correct": 54.6583850931677,
+      "top1_maxfrag": 40.37267080745342
+    },
+    "llm": {
+      "top1_all_correct": 0.0,
+      "topk_all_correct": 0.0,
+      "top1_maxfrag": 1.8633540372670807
+    }
+  },
+  "views": {
+    "hybrid": {
+      "run": "uspto_50k_test_250_Qwen3-32B_deepretro_autosolve_USPTO",
+      "model_id": "hosted_vllm/Qwen/Qwen3-32B",
+      "mode": "autosolve",
+      "thinking": false,
+      "max_new_tokens": 1024,
+      "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+      "n_total": 250,
+      "az_model": "USPTO",
+      "az_config": "/root/workspace/DFS/DeepRetro/../aizynthfinder/models/USPTO/config.yml",
+      "view": "hybrid",
+      "n_scored": 250,
+      "timestamp": "2026-09-23T17:09:21",
+      "top1": {
+        "all_correct": 24.0,
+        "any_correct": 32.0,
+        "maxfrag": 26.8,
+        "n_all_correct": 60,
+        "n_any_correct": 80,
+        "n_maxfrag": 67
+      },
+      "topk": {
+        "all_correct": 36.0,
+        "any_correct": 47.2,
+        "maxfrag": 41.6,
+        "n_all_correct": 90,
+        "n_any_correct": 118,
+        "n_maxfrag": 104
+      },
+      "parse_failures_pct": 4.4,
+      "invalid_smiles_pct": 0.0,
+      "mean_proposals": 4.224
+    },
+    "az": {
+      "run": "uspto_50k_test_250_Qwen3-32B_deepretro_autosolve_USPTO",
+      "model_id": "hosted_vllm/Qwen/Qwen3-32B",
+      "mode": "autosolve",
+      "thinking": false,
+      "max_new_tokens": 1024,
+      "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+      "n_total": 250,
+      "az_model": "USPTO",
+      "az_config": "/root/workspace/DFS/DeepRetro/../aizynthfinder/models/USPTO/config.yml",
+      "view": "az",
+      "n_scored": 250,
+      "timestamp": "2026-09-23T17:09:21",
+      "top1": {
+        "all_correct": 23.6,
+        "any_correct": 30.0,
+        "maxfrag": 26.0,
+        "n_all_correct": 59,
+        "n_any_correct": 75,
+        "n_maxfrag": 65
+      },
+      "topk": {
+        "all_correct": 35.2,
+        "any_correct": 44.4,
+        "maxfrag": 39.6,
+        "n_all_correct": 88,
+        "n_any_correct": 111,
+        "n_maxfrag": 99
+      },
+      "parse_failures_pct": 35.6,
+      "invalid_smiles_pct": 0.0,
+      "mean_proposals": 3.308
+    },
+    "llm": {
+      "run": "uspto_50k_test_250_Qwen3-32B_deepretro_autosolve_USPTO",
+      "model_id": "hosted_vllm/Qwen/Qwen3-32B",
+      "mode": "autosolve",
+      "thinking": false,
+      "max_new_tokens": 1024,
+      "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+      "n_total": 250,
+      "az_model": "USPTO",
+      "az_config": "/root/workspace/DFS/DeepRetro/../aizynthfinder/models/USPTO/config.yml",
+      "view": "llm",
+      "n_scored": 250,
+      "timestamp": "2026-09-23T17:09:21",
+      "top1": {
+        "all_correct": 0.4,
+        "any_correct": 5.2,
+        "maxfrag": 2.0,
+        "n_all_correct": 1,
+        "n_any_correct": 13,
+        "n_maxfrag": 5
+      },
+      "topk": {
+        "all_correct": 0.8,
+        "any_correct": 8.8,
+        "maxfrag": 4.4,
+        "n_all_correct": 2,
+        "n_any_correct": 22,
+        "n_maxfrag": 11
+      },
+      "parse_failures_pct": 9.6,
+      "invalid_smiles_pct": 0.0,
+      "mean_proposals": 2.708
+    }
+  }
+}
