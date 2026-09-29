@@ -29,6 +29,8 @@ Modes:
     does. AZ's answer is the first reaction of each route it finds. Both AZ
     and the LLM run on every molecule (separate checkpoints), and three views
     are scored: ``hybrid`` (AZ if it solved, else LLM), ``az`` and ``llm``.
+    The AZ checkpoint does not depend on the LLM, so it lives in a shared
+    cache (``--az-cache``) and runs with other LLMs skip the search.
     Needs aizynthfinder and ``AZ_MODELS_PATH``/``AZ_MODEL_CONFIG_PATH``.
 
 Generation is resumable: finished molecules are read back from the JSONL
@@ -212,11 +214,26 @@ def run_az_step(args: argparse.Namespace, df: pd.DataFrame, jsonl: str) -> None:
     print(f"[az] {len(todo)} molecules in {(time.time() - started) / 60:.2f} min")
 
 
+def az_cache_path(args: argparse.Namespace) -> str:
+    """Shared AZ checkpoint for this dataset and AZ model.
+
+    AZ results do not depend on the LLM, so every autosolve run over the same
+    data and AZ model reads and extends one file instead of searching again.
+    """
+    if args.az_cache:
+        return args.az_cache
+    cache_dir = os.path.join(args.out_root, "az_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, f"{Path(args.data).stem}_{args.az_model}.jsonl")
+
+
 def score_autosolve(args: argparse.Namespace, df: pd.DataFrame, out_dir: str,
                     meta: dict[str, Any]) -> None:
     """Score the hybrid/az/llm views and write per-view results and one summary."""
-    az_recs = load_checkpoint(os.path.join(out_dir, "az.jsonl"))
-    llm_recs = load_checkpoint(os.path.join(out_dir, "llm.jsonl"))
+    # The shared AZ cache can cover more molecules than this run; keep to this run's rows.
+    in_run = {int(i) for i in df.index[: args.limit]}
+    az_recs = {i: r for i, r in load_checkpoint(az_cache_path(args)).items() if i in in_run}
+    llm_recs = {i: r for i, r in load_checkpoint(os.path.join(out_dir, "llm.jsonl")).items() if i in in_run}
     both = sorted(set(az_recs) & set(llm_recs))
     missing = len(set(az_recs) ^ set(llm_recs))
     if missing:
@@ -289,8 +306,10 @@ def run_autosolve(args: argparse.Namespace, df: pd.DataFrame, out_dir: str,
                   meta: dict[str, Any]) -> None:
     config = resolve_az_config(args.az_model)
     print(f"AZ config: {config}")
+    az_jsonl = az_cache_path(args)
+    print(f"AZ cache: {az_jsonl}")
     run_llm_step(args, df, os.path.join(out_dir, "llm.jsonl"))
-    run_az_step(args, df, os.path.join(out_dir, "az.jsonl"))
+    run_az_step(args, df, az_jsonl)
     score_autosolve(args, df, out_dir, {**meta, "az_model": args.az_model, "az_config": config})
 
 
@@ -307,6 +326,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
                         help="autosolve mode: AZ model folder under AZ_MODELS_PATH")
     parser.add_argument("--az-workers", type=int, default=4,
                         help="autosolve mode: parallel AZ processes (each loads its own model)")
+    parser.add_argument("--az-cache", default=None,
+                        help="autosolve mode: AZ checkpoint shared across LLM runs "
+                             "(default: <out-root>/az_cache/<data>_<az-model>.jsonl)")
     parser.add_argument("--workers", type=int, default=64,
                         help="concurrent requests; vLLM batches them")
     parser.add_argument("--limit", type=int, default=None, help="evaluate the first N molecules")
