@@ -1,0 +1,30 @@
+{
+  "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_think_deepretro_raw",
+  "model_id": "hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731",
+  "mode": "raw",
+  "thinking": true,
+  "max_new_tokens": 16384,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_total": 250,
+  "n_scored": 10,
+  "timestamp": "2026-09-29T15:33:29",
+  "top1": {
+    "all_correct": 10.0,
+    "any_correct": 10.0,
+    "maxfrag": 10.0,
+    "n_all_correct": 1,
+    "n_any_correct": 1,
+    "n_maxfrag": 1
+  },
+  "topk": {
+    "all_correct": 10.0,
+    "any_correct": 10.0,
+    "maxfrag": 10.0,
+    "n_all_correct": 1,
+    "n_any_correct": 1,
+    "n_maxfrag": 1
+  },
+  "parse_failures_pct": 80.0,
+  "invalid_smiles_pct": 0.0,
+  "mean_proposals": 0.8
+}

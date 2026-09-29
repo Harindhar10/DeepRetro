@@ -1,0 +1,2 @@
+{"mol_no": 8, "proposals": [["CC(=O)c1cncc(C=O)c1", "OCCO"], ["CC1(c2cncc(CO)c2)OCCO1"], ["CC1(c2cncc(C#N)c2)OCCO1"], ["CC1(c2cncc(Br)c2)OCCO1"]], "confidence": [0.9, 0.85, 0.7, 0.75]}
+{"mol_no": 0, "proposals": [["CS(=O)c1cccc(B(O)O)c1", "CC(C)(C)[Si](C)(C)OCCOc1ccc(C=O)nc1Br"], ["CSc1cccc(-c2nc(C=O)ccc2OCCO[Si](C)(C)C(C)(C)C)c1"], ["CS(=O)c1cccc(-c2nc(CO)ccc2OCCO[Si](C)(C)C(C)(C)C)c1"], ["CS(=O)c1cccc(-c2nc(C=O)ccc2OCCO)c1"], ["CS(=O)c1cccc(-c2nc(C=O)ccc2O)c1", "CC(C)(C)[Si](C)(C)OCCBr"]], "confidence": [0.85, 0.9, 0.85, 0.7, 0.75]}

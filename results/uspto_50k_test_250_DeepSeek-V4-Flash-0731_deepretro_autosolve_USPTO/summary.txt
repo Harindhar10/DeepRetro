@@ -1,0 +1,66 @@
+model: hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731   az_model: USPTO   scored 250 molecules
+AZ solved 66.4%, answered (has a first step) 64.4%, 0 AZ errors, 6.8 s/molecule
+On the 161 molecules AZ answered -- top-1 all_correct: AZ 36.6% vs LLM 14.3%
+
+##### view: hybrid #####
+model: hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731  mode: autosolve
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 28.40  (71/250)
+Any correct % 38.40  (96/250)
+MaxFrag     % 32.40  (81/250)
+
+=== top-k (best proposal) ===
+All correct % 41.20  (103/250)
+Any correct % 54.40  (136/250)
+MaxFrag     % 48.80  (122/250)
+
+=== response quality ===
+parse failures  : 5.60%
+invalid SMILES  : 0.00%
+mean proposals  : 4.02
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.
+
+##### view: az #####
+model: hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731  mode: autosolve
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 23.60  (59/250)
+Any correct % 30.40  (76/250)
+MaxFrag     % 26.40  (66/250)
+
+=== top-k (best proposal) ===
+All correct % 35.20  (88/250)
+Any correct % 44.80  (112/250)
+MaxFrag     % 40.00  (100/250)
+
+=== response quality ===
+parse failures  : 35.60%
+invalid SMILES  : 0.00%
+mean proposals  : 3.31
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.
+
+##### view: llm #####
+model: hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731  mode: autosolve
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 14.00  (35/250)
+Any correct % 23.60  (59/250)
+MaxFrag     % 16.80  (42/250)
+
+=== top-k (best proposal) ===
+All correct % 18.00  (45/250)
+Any correct % 30.00  (75/250)
+MaxFrag     % 23.60  (59/250)
+
+=== response quality ===
+parse failures  : 13.20%
+invalid SMILES  : 0.00%
+mean proposals  : 2.00
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.

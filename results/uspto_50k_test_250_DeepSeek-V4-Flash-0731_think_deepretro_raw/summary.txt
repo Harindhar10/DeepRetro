@@ -1,0 +1,19 @@
+model: hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731  mode: raw
+scored 10 molecules
+
+=== top-1 (first proposal) ===
+All correct % 10.00  (1/10)
+Any correct % 10.00  (1/10)
+MaxFrag     % 10.00  (1/10)
+
+=== top-k (best proposal) ===
+All correct % 10.00  (1/10)
+Any correct % 10.00  (1/10)
+MaxFrag     % 10.00  (1/10)
+
+=== response quality ===
+parse failures  : 80.00%
+invalid SMILES  : 0.00%
+mean proposals  : 0.80
+
+Denominator is all 10 scored rows -- parse failures count as incorrect.

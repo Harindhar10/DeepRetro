@@ -1,0 +1,131 @@
+{
+  "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_deepretro_autosolve_USPTO",
+  "model_id": "hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731",
+  "mode": "autosolve",
+  "thinking": false,
+  "max_new_tokens": 1024,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_total": 250,
+  "az_model": "USPTO",
+  "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
+  "n_scored": 250,
+  "coverage": {
+    "az_solved_pct": 66.4,
+    "az_answered_pct": 64.4,
+    "az_errors": 0,
+    "az_mean_seconds": 6.8288400000000005
+  },
+  "az_answered_subset": {
+    "az": {
+      "top1_all_correct": 36.64596273291926,
+      "topk_all_correct": 54.6583850931677,
+      "top1_maxfrag": 40.993788819875775
+    },
+    "llm": {
+      "top1_all_correct": 14.285714285714285,
+      "topk_all_correct": 18.633540372670808,
+      "top1_maxfrag": 16.77018633540373
+    }
+  },
+  "views": {
+    "hybrid": {
+      "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_deepretro_autosolve_USPTO",
+      "model_id": "hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731",
+      "mode": "autosolve",
+      "thinking": false,
+      "max_new_tokens": 1024,
+      "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+      "n_total": 250,
+      "az_model": "USPTO",
+      "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
+      "view": "hybrid",
+      "n_scored": 250,
+      "timestamp": "2026-09-29T14:51:21",
+      "top1": {
+        "all_correct": 28.4,
+        "any_correct": 38.4,
+        "maxfrag": 32.4,
+        "n_all_correct": 71,
+        "n_any_correct": 96,
+        "n_maxfrag": 81
+      },
+      "topk": {
+        "all_correct": 41.2,
+        "any_correct": 54.4,
+        "maxfrag": 48.8,
+        "n_all_correct": 103,
+        "n_any_correct": 136,
+        "n_maxfrag": 122
+      },
+      "parse_failures_pct": 5.6,
+      "invalid_smiles_pct": 0.0,
+      "mean_proposals": 4.016
+    },
+    "az": {
+      "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_deepretro_autosolve_USPTO",
+      "model_id": "hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731",
+      "mode": "autosolve",
+      "thinking": false,
+      "max_new_tokens": 1024,
+      "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+      "n_total": 250,
+      "az_model": "USPTO",
+      "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
+      "view": "az",
+      "n_scored": 250,
+      "timestamp": "2026-09-29T14:51:21",
+      "top1": {
+        "all_correct": 23.6,
+        "any_correct": 30.4,
+        "maxfrag": 26.4,
+        "n_all_correct": 59,
+        "n_any_correct": 76,
+        "n_maxfrag": 66
+      },
+      "topk": {
+        "all_correct": 35.2,
+        "any_correct": 44.8,
+        "maxfrag": 40.0,
+        "n_all_correct": 88,
+        "n_any_correct": 112,
+        "n_maxfrag": 100
+      },
+      "parse_failures_pct": 35.6,
+      "invalid_smiles_pct": 0.0,
+      "mean_proposals": 3.312
+    },
+    "llm": {
+      "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_deepretro_autosolve_USPTO",
+      "model_id": "hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731",
+      "mode": "autosolve",
+      "thinking": false,
+      "max_new_tokens": 1024,
+      "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+      "n_total": 250,
+      "az_model": "USPTO",
+      "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
+      "view": "llm",
+      "n_scored": 250,
+      "timestamp": "2026-09-29T14:51:21",
+      "top1": {
+        "all_correct": 14.0,
+        "any_correct": 23.6,
+        "maxfrag": 16.8,
+        "n_all_correct": 35,
+        "n_any_correct": 59,
+        "n_maxfrag": 42
+      },
+      "topk": {
+        "all_correct": 18.0,
+        "any_correct": 30.0,
+        "maxfrag": 23.6,
+        "n_all_correct": 45,
+        "n_any_correct": 75,
+        "n_maxfrag": 59
+      },
+      "parse_failures_pct": 13.2,
+      "invalid_smiles_pct": 0.0,
+      "mean_proposals": 1.996
+    }
+  }
+}
