@@ -1,0 +1,19 @@
+model: hosted_vllm/futurehouse/ether0  mode: raw
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 8.00  (20/250)
+Any correct % 20.80  (52/250)
+MaxFrag     % 20.80  (52/250)
+
+=== top-k (best proposal) ===
+All correct % 8.00  (20/250)
+Any correct % 20.80  (52/250)
+MaxFrag     % 20.80  (52/250)
+
+=== response quality ===
+parse failures  : 0.00%
+invalid SMILES  : 6.40%
+mean proposals  : 1.00
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.

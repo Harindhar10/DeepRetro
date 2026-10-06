@@ -1,0 +1,31 @@
+{
+  "run": "uspto_50k_test_250_ether0_deepretro_raw_ether0prompt",
+  "model_id": "hosted_vllm/futurehouse/ether0",
+  "mode": "raw",
+  "prompt": "ether0",
+  "thinking": false,
+  "max_new_tokens": 8192,
+  "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
+  "n_total": 250,
+  "n_scored": 250,
+  "timestamp": "2026-10-06T18:19:30",
+  "top1": {
+    "all_correct": 8.0,
+    "any_correct": 20.8,
+    "maxfrag": 20.8,
+    "n_all_correct": 20,
+    "n_any_correct": 52,
+    "n_maxfrag": 52
+  },
+  "topk": {
+    "all_correct": 8.0,
+    "any_correct": 20.8,
+    "maxfrag": 20.8,
+    "n_all_correct": 20,
+    "n_any_correct": 52,
+    "n_maxfrag": 52
+  },
+  "parse_failures_pct": 0.0,
+  "invalid_smiles_pct": 6.4,
+  "mean_proposals": 1.0
+}
