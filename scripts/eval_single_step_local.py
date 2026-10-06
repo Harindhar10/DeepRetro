@@ -33,10 +33,11 @@ Modes:
     cache (``--az-cache``) and runs with other LLMs skip the search.
     Needs aizynthfinder and ``AZ_MODELS_PATH``/``AZ_MODEL_CONFIG_PATH``.
 
-``--prompt ether0`` (raw mode only) replaces DeepRetro's prompt with the
+``--prompt ether0`` (any mode) replaces DeepRetro's prompt with the
 retrosynthesis prompt futurehouse/ether0 was trained on, which asks for a single
 reaction SMILES. Use it to give ether0 a fair run; its answer is parsed into one
-proposal (the reactants), so only top-1 is meaningful.
+proposal (the reactants), so only top-1 is meaningful. In pipeline and autosolve
+modes the prompt goes through ``llm_pipeline``, so retries and filters still apply.
 
 Generation is resumable: finished molecules are read back from the JSONL
 checkpoint and skipped, so an interrupted run can simply be restarted.
@@ -87,12 +88,25 @@ ETHER0_RETRO_PROMPT = (
 )
 
 
+def ether0_messages(smiles: str) -> list[dict[str, str]]:
+    """Chat messages asking ether0 for a one-step synthesis of ``smiles``."""
+    return [{"role": "user", "content": ETHER0_RETRO_PROMPT.format(smiles=smiles)}]
+
+
+def prompt_messages(args: argparse.Namespace, smiles: str) -> list[dict[str, str]] | None:
+    """Explicit messages for ``--prompt``, or ``None`` for DeepRetro's own prompt."""
+    return ether0_messages(smiles) if args.prompt == "ether0" else None
+
+
+def ether0_pipeline(molecule: str, **kwargs: Any) -> tuple[list[Any], list[str], list[float]]:
+    """``llm_pipeline`` with ether0's prompt; an ``AutoSolver`` ``llm_runner``."""
+    return llm_pipeline(molecule, messages=ether0_messages(molecule), **kwargs)
+
+
 def generate_one(args: argparse.Namespace, smiles: str) -> dict[str, Any]:
     """Run one molecule and return the fields to store in its record."""
+    messages = prompt_messages(args, smiles)
     if args.mode == "raw":
-        messages = None
-        if args.prompt == "ether0":
-            messages = [{"role": "user", "content": ETHER0_RETRO_PROMPT.format(smiles=smiles)}]
         status, text = call_LLM(
             smiles,
             model=args.model,
@@ -105,6 +119,7 @@ def generate_one(args: argparse.Namespace, smiles: str) -> dict[str, Any]:
     pathways, _, _ = llm_pipeline(
         smiles,
         model=args.model,
+        messages=messages,
         enable_thinking=args.thinking,
         max_output_tokens=args.max_output_tokens,
         stability_check=args.stability_check,
@@ -189,6 +204,7 @@ def run_llm_step(args: argparse.Namespace, df: pd.DataFrame, jsonl: str) -> None
         return
     solver = AutoSolver(
         llm=args.model,
+        llm_runner=ether0_pipeline if args.prompt == "ether0" else None,
         az_model=args.az_model,
         stability_check=args.stability_check,
         hallucination_mode="heuristic" if args.hallucination_check else "none",
@@ -344,7 +360,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
                         help="default: 1024, or 16384 with --thinking")
     parser.add_argument("--mode", choices=["raw", "pipeline", "autosolve"], default="raw")
     parser.add_argument("--prompt", choices=["deepretro", "ether0"], default="deepretro",
-                        help="raw mode: DeepRetro's prompt, or ether0's native one")
+                        help="DeepRetro's prompt, or ether0's native one (all modes)")
     parser.add_argument("--az-model", default="USPTO",
                         help="autosolve mode: AZ model folder under AZ_MODELS_PATH")
     parser.add_argument("--az-workers", type=int, default=4,
@@ -362,10 +378,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = build_arg_parser()
-    args = parser.parse_args(argv)
-    if args.prompt != "deepretro" and args.mode != "raw":
-        parser.error("--prompt ether0 only works with --mode raw")
+    args = build_arg_parser().parse_args(argv)
     if args.max_output_tokens is None:
         args.max_output_tokens = 16384 if args.thinking else 1024
 
