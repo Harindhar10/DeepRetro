@@ -37,7 +37,8 @@ from deepretro.utils.utils_molecule import validity_check
 
 load_dotenv()
 
-litellm.success_callback = ["langfuse"]
+# litellm.success_callback = ["langfuse"]
+litellm.callbacks = ["langfuse_otel"]
 litellm.drop_params = True
 
 logger = structlog.get_logger(__name__)

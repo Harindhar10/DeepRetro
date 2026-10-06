@@ -1,0 +1,66 @@
+model: hosted_vllm/futurehouse/ether0   az_model: USPTO   scored 250 molecules
+AZ solved 66.4%, answered (has a first step) 64.4%, 0 AZ errors, 6.8 s/molecule
+On the 161 molecules AZ answered -- top-1 all_correct: AZ 36.6% vs LLM 5.6%
+
+##### view: hybrid #####
+model: hosted_vllm/futurehouse/ether0  mode: autosolve
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 28.40  (71/250)
+Any correct % 39.60  (99/250)
+MaxFrag     % 36.00  (90/250)
+
+=== top-k (best proposal) ===
+All correct % 40.00  (100/250)
+Any correct % 54.00  (135/250)
+MaxFrag     % 49.60  (124/250)
+
+=== response quality ===
+parse failures  : 3.20%
+invalid SMILES  : 0.00%
+mean proposals  : 3.64
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.
+
+##### view: az #####
+model: hosted_vllm/futurehouse/ether0  mode: autosolve
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 23.60  (59/250)
+Any correct % 30.40  (76/250)
+MaxFrag     % 26.40  (66/250)
+
+=== top-k (best proposal) ===
+All correct % 35.20  (88/250)
+Any correct % 44.80  (112/250)
+MaxFrag     % 40.00  (100/250)
+
+=== response quality ===
+parse failures  : 35.60%
+invalid SMILES  : 0.00%
+mean proposals  : 3.31
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.
+
+##### view: llm #####
+model: hosted_vllm/futurehouse/ether0  mode: autosolve
+scored 250 molecules
+
+=== top-1 (first proposal) ===
+All correct % 8.40  (21/250)
+Any correct % 26.40  (66/250)
+MaxFrag     % 22.00  (55/250)
+
+=== top-k (best proposal) ===
+All correct % 8.40  (21/250)
+Any correct % 26.40  (66/250)
+MaxFrag     % 22.00  (55/250)
+
+=== response quality ===
+parse failures  : 4.00%
+invalid SMILES  : 0.00%
+mean proposals  : 0.96
+
+Denominator is all 250 scored rows -- parse failures count as incorrect.
