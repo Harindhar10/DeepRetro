@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import time
 from abc import ABC, abstractmethod
@@ -41,6 +42,11 @@ logger = structlog.get_logger(__name__)
 MAX_API_RETRIES = 2
 THINK_START_TAG = "<think>"
 THINK_END_TAG = "</think>"
+# ether0 (futurehouse/ether0) wraps its reasoning and answer in its own tags.
+ETHER0_THINK_START_TAG = "<|think_start|>"
+ETHER0_THINK_END_TAG = "<|think_end|>"
+ETHER0_ANSWER_START_TAG = "<|answer_start|>"
+ETHER0_ANSWER_END_TAG = "<|answer_end|>"
 PROMPT_CONFIG = {
     ("deepseek", "standard"): (SYS_PROMPT_DEEPSEEK, USER_PROMPT_DEEPSEEK, 16384),
     ("deepseek", "advanced"): (SYS_PROMPT_V4, USER_PROMPT_DEEPSEEK_V4, 16384),
@@ -503,13 +509,64 @@ class LocalLLM(LLMInterface):
         (200, ['x'], '{"data": []}')
         >>> LocalLLM("hosted_vllm/Qwen/Qwen3-8B").parse_response("no payload")
         (502, [], '')
+
+        ether0-style answers are converted by :func:`parse_reaction_answer`.
         """
+        if ETHER0_ANSWER_START_TAG in response_text:
+            return parse_reaction_answer(response_text)
         thinking, answer = split_thinking(response_text)
         json_content = extract_json_payload(answer)
         if not json_content:
             return 502, [], ""
         thinking_steps = [thinking] if thinking else []
         return 200, thinking_steps, json_content
+
+
+def parse_reaction_answer(response_text: str) -> tuple[int, list[str], str]:
+    """Parse an ether0-style reaction-SMILES answer into DeepRetro's JSON payload.
+
+    ether0 ends with ``<|answer_start|>reactants>reagents>product<|answer_end|>``.
+    The reactants (the text before the first ``>``; the whole answer if it is
+    not a reaction) become one pathway, so the payload has the same shape as a
+    regular DeepRetro response and scores the same way. Reagents are dropped.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw model response text containing ``<|answer_start|>``.
+
+    Returns
+    -------
+    tuple[int, list[str], str]
+        Status code, optional thinking steps, and JSON payload.
+
+    Examples
+    --------
+    >>> status, steps, payload = parse_reaction_answer(
+    ...     "<|think_start|>x<|think_end|><|answer_start|>CC=O.N>[H]>CCN<|answer_end|>"
+    ... )
+    >>> status, steps, json.loads(payload)["data"]
+    (200, ['x'], [['CC=O', 'N']])
+    >>> json.loads(parse_reaction_answer("<|answer_start|>CCO<|answer_end|>")[2])["data"]
+    [['CCO']]
+    >>> parse_reaction_answer("<|answer_start|>>>CCN<|answer_end|>")
+    (502, [], '')
+    """
+    thinking = ""
+    if ETHER0_THINK_END_TAG in response_text:
+        thinking = response_text.split(ETHER0_THINK_END_TAG, 1)[0]
+        thinking = thinking.replace(ETHER0_THINK_START_TAG, "", 1).strip()
+    answer = response_text.rsplit(ETHER0_ANSWER_START_TAG, 1)[-1]
+    answer = answer.split(ETHER0_ANSWER_END_TAG, 1)[0].strip()
+    reactants = [s.strip() for s in answer.split(">", 1)[0].split(".") if s.strip()]
+    if not reactants:
+        return 502, [], ""
+    payload = json.dumps({
+        "data": [reactants],
+        "explanation": [""],
+        "confidence_scores": [1.0],
+    })
+    return 200, [thinking] if thinking else [], payload
 
 
 def split_thinking(response_text: str) -> tuple[str, str]:

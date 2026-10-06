@@ -33,6 +33,11 @@ Modes:
     cache (``--az-cache``) and runs with other LLMs skip the search.
     Needs aizynthfinder and ``AZ_MODELS_PATH``/``AZ_MODEL_CONFIG_PATH``.
 
+``--prompt ether0`` (raw mode only) replaces DeepRetro's prompt with the
+retrosynthesis prompt futurehouse/ether0 was trained on, which asks for a single
+reaction SMILES. Use it to give ether0 a fair run; its answer is parsed into one
+proposal (the reactants), so only top-1 is meaningful.
+
 Generation is resumable: finished molecules are read back from the JSONL
 checkpoint and skipped, so an interrupted run can simply be restarted.
 """
@@ -74,14 +79,24 @@ from deepretro.utils.one_step_eval import (  # noqa: E402
 from deepretro.utils.utils_molecule import canonicalize  # noqa: E402
 
 AUTOSOLVE_VIEWS = ("hybrid", "az", "llm")
+# A retro-synthesis prompt from the futurehouse/ether0-benchmark dataset.
+ETHER0_RETRO_PROMPT = (
+    "Suggest a commercially feasible one-step route to synthesize {smiles}. "
+    "Answer with reaction smiles format "
+    "(e.g., CC=O.O=C1CCC1Cl>[Mg2+].CCOCC>CC(O)C1CCC1=O)"
+)
 
 
 def generate_one(args: argparse.Namespace, smiles: str) -> dict[str, Any]:
     """Run one molecule and return the fields to store in its record."""
     if args.mode == "raw":
+        messages = None
+        if args.prompt == "ether0":
+            messages = [{"role": "user", "content": ETHER0_RETRO_PROMPT.format(smiles=smiles)}]
         status, text = call_LLM(
             smiles,
             model=args.model,
+            messages=messages,
             temperature=1.0,
             enable_thinking=args.thinking,
             max_output_tokens=args.max_output_tokens,
@@ -328,6 +343,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-output-tokens", type=int, default=None,
                         help="default: 1024, or 16384 with --thinking")
     parser.add_argument("--mode", choices=["raw", "pipeline", "autosolve"], default="raw")
+    parser.add_argument("--prompt", choices=["deepretro", "ether0"], default="deepretro",
+                        help="raw mode: DeepRetro's prompt, or ether0's native one")
     parser.add_argument("--az-model", default="USPTO",
                         help="autosolve mode: AZ model folder under AZ_MODELS_PATH")
     parser.add_argument("--az-workers", type=int, default=4,
@@ -345,7 +362,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
-    args = build_arg_parser().parse_args(argv)
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+    if args.prompt != "deepretro" and args.mode != "raw":
+        parser.error("--prompt ether0 only works with --mode raw")
     if args.max_output_tokens is None:
         args.max_output_tokens = 16384 if args.thinking else 1024
 
@@ -354,6 +374,8 @@ def main(argv: list[str] | None = None) -> None:
     run_name = f"{data_slug}_{model_slug}{'_think' if args.thinking else ''}_deepretro_{args.mode}"
     if args.mode == "autosolve":
         run_name += f"_{args.az_model}"
+    if args.prompt != "deepretro":
+        run_name += f"_{args.prompt}prompt"
     out_dir = os.path.join(args.out_root, run_name)
     os.makedirs(out_dir, exist_ok=True)
     print(f"writing to {out_dir}")
@@ -363,6 +385,7 @@ def main(argv: list[str] | None = None) -> None:
         "run": run_name,
         "model_id": args.model,
         "mode": args.mode,
+        "prompt": args.prompt,
         "thinking": args.thinking,
         "max_new_tokens": args.max_output_tokens,
         "data_csv": args.data,
