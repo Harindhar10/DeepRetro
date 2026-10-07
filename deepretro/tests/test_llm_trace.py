@@ -584,3 +584,11 @@ def test_no_langfuse_client_without_keys(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
     monkeypatch.setattr(llm_trace, "_client_cache", None)
     assert llm_trace.build_langfuse_client() is None
+
+
+def test_langfuse_configured_requires_both_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk")
+    monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
+    assert llm_trace.langfuse_configured() is False
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk")
+    assert llm_trace.langfuse_configured() is True

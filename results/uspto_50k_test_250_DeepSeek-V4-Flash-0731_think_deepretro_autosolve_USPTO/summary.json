@@ -1,10 +1,10 @@
 {
-  "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_deepretro_autosolve_USPTO",
+  "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_think_deepretro_autosolve_USPTO",
   "model_id": "hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731",
   "mode": "autosolve",
   "prompt": "deepretro",
-  "thinking": false,
-  "max_new_tokens": 1024,
+  "thinking": true,
+  "max_new_tokens": 16384,
   "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
   "n_total": 250,
   "az_model": "USPTO",
@@ -23,26 +23,26 @@
       "top1_maxfrag": 66.66666666666666
     },
     "llm": {
-      "top1_all_correct": 0.0,
-      "topk_all_correct": 16.666666666666664,
-      "top1_maxfrag": 0.0
+      "top1_all_correct": 33.33333333333333,
+      "topk_all_correct": 33.33333333333333,
+      "top1_maxfrag": 33.33333333333333
     }
   },
   "views": {
     "hybrid": {
-      "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_deepretro_autosolve_USPTO",
+      "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_think_deepretro_autosolve_USPTO",
       "model_id": "hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731",
       "mode": "autosolve",
       "prompt": "deepretro",
-      "thinking": false,
-      "max_new_tokens": 1024,
+      "thinking": true,
+      "max_new_tokens": 16384,
       "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
       "n_total": 250,
       "az_model": "USPTO",
       "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
       "view": "hybrid",
       "n_scored": 8,
-      "timestamp": "2026-10-07T12:34:55",
+      "timestamp": "2026-10-07T12:57:08",
       "top1": {
         "all_correct": 50.0,
         "any_correct": 75.0,
@@ -61,22 +61,22 @@
       },
       "parse_failures_pct": 0.0,
       "invalid_smiles_pct": 0.0,
-      "mean_proposals": 4.75
+      "mean_proposals": 4.625
     },
     "az": {
-      "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_deepretro_autosolve_USPTO",
+      "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_think_deepretro_autosolve_USPTO",
       "model_id": "hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731",
       "mode": "autosolve",
       "prompt": "deepretro",
-      "thinking": false,
-      "max_new_tokens": 1024,
+      "thinking": true,
+      "max_new_tokens": 16384,
       "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
       "n_total": 250,
       "az_model": "USPTO",
       "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
       "view": "az",
       "n_scored": 8,
-      "timestamp": "2026-10-07T12:34:55",
+      "timestamp": "2026-10-07T12:57:08",
       "top1": {
         "all_correct": 50.0,
         "any_correct": 75.0,
@@ -98,38 +98,38 @@
       "mean_proposals": 3.625
     },
     "llm": {
-      "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_deepretro_autosolve_USPTO",
+      "run": "uspto_50k_test_250_DeepSeek-V4-Flash-0731_think_deepretro_autosolve_USPTO",
       "model_id": "hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731",
       "mode": "autosolve",
       "prompt": "deepretro",
-      "thinking": false,
-      "max_new_tokens": 1024,
+      "thinking": true,
+      "max_new_tokens": 16384,
       "data_csv": "/root/workspace/DFS/DeepRetro/data/uspto_50k_test_250.csv",
       "n_total": 250,
       "az_model": "USPTO",
       "az_config": "/root/workspace/DFS/DeepRetro/aizynthfinder/models/USPTO/config.yml",
       "view": "llm",
       "n_scored": 8,
-      "timestamp": "2026-10-07T12:34:55",
+      "timestamp": "2026-10-07T12:57:08",
       "top1": {
-        "all_correct": 0.0,
-        "any_correct": 12.5,
-        "maxfrag": 0.0,
-        "n_all_correct": 0,
-        "n_any_correct": 1,
-        "n_maxfrag": 0
+        "all_correct": 25.0,
+        "any_correct": 25.0,
+        "maxfrag": 25.0,
+        "n_all_correct": 2,
+        "n_any_correct": 2,
+        "n_maxfrag": 2
       },
       "topk": {
-        "all_correct": 12.5,
+        "all_correct": 25.0,
         "any_correct": 25.0,
-        "maxfrag": 12.5,
-        "n_all_correct": 1,
+        "maxfrag": 37.5,
+        "n_all_correct": 2,
         "n_any_correct": 2,
-        "n_maxfrag": 1
+        "n_maxfrag": 3
       },
-      "parse_failures_pct": 37.5,
+      "parse_failures_pct": 25.0,
       "invalid_smiles_pct": 0.0,
-      "mean_proposals": 2.25
+      "mean_proposals": 3.25
     }
   }
 }

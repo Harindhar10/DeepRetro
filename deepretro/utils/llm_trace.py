@@ -251,6 +251,20 @@ def molecule_trace(
         _flush_langfuse()
 
 
+def langfuse_configured() -> bool:
+    """Return whether both Langfuse API keys are set in the environment.
+
+    Without them litellm's ``langfuse_otel`` callback falls back to printing
+    OpenTelemetry spans to the console, and no tool events are sent.
+
+    Returns
+    -------
+    bool
+        ``True`` when ``LANGFUSE_PUBLIC_KEY`` and ``LANGFUSE_SECRET_KEY`` are set.
+    """
+    return bool(os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"))
+
+
 def build_langfuse_client() -> Any | None:
     """Build (once) the Langfuse client used for tool events.
 
@@ -274,7 +288,7 @@ def build_langfuse_client() -> Any | None:
     if _client_checked:
         return _client_cache
     _client_checked = True
-    if not (os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY")):
+    if not langfuse_configured():
         return None
     try:
         from langfuse import Langfuse

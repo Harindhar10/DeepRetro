@@ -68,6 +68,7 @@ os.environ["AZ_MODEL_CONFIG_PATH"] = "aizynthfinder/models/USPTO/config.yml"
 import pandas as pd  # noqa: E402
 
 from deepretro.utils.llm import call_LLM, llm_pipeline  # noqa: E402
+from deepretro.utils.llm_trace import langfuse_configured  # noqa: E402
 from deepretro.utils.one_step_eval import (  # noqa: E402
     hybrid_views,
     load_checkpoint,
@@ -392,6 +393,11 @@ def main(argv: list[str] | None = None) -> None:
     out_dir = os.path.join(args.out_root, run_name)
     os.makedirs(out_dir, exist_ok=True)
     print(f"writing to {out_dir}")
+    if langfuse_configured():
+        host = os.getenv("LANGFUSE_OTEL_HOST") or os.getenv("LANGFUSE_HOST") or "default"
+        print(f"langfuse: enabled (host={host})")
+    else:
+        print("langfuse: disabled (no LANGFUSE_* keys; OTEL spans go to console)")
 
     df = pd.read_csv(args.data)
     meta = {

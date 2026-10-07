@@ -1,2 +1,10 @@
 {"mol_no": 8, "proposals": [["CC(=O)c1cncc(C=O)c1", "OCCO"], ["CC1(c2cncc(CO)c2)OCCO1"], ["CC1(c2cncc(C#N)c2)OCCO1"], ["CC1(c2cncc(Br)c2)OCCO1"]], "confidence": [0.9, 0.85, 0.7, 0.75]}
 {"mol_no": 0, "proposals": [["CS(=O)c1cccc(B(O)O)c1", "CC(C)(C)[Si](C)(C)OCCOc1ccc(C=O)nc1Br"], ["CSc1cccc(-c2nc(C=O)ccc2OCCO[Si](C)(C)C(C)(C)C)c1"], ["CS(=O)c1cccc(-c2nc(CO)ccc2OCCO[Si](C)(C)C(C)(C)C)c1"], ["CS(=O)c1cccc(-c2nc(C=O)ccc2OCCO)c1"], ["CS(=O)c1cccc(-c2nc(C=O)ccc2O)c1", "CC(C)(C)[Si](C)(C)OCCBr"]], "confidence": [0.85, 0.9, 0.85, 0.7, 0.75]}
+{"mol_no": 2, "proposals": [["CCC(=O)c1ccc(C=O)s1", "OCCO"], ["CCC1(c2cccs2)OCCO1"], ["CCC1(c2ccc(CO)s2)OCCO1"], ["CCC(OC)(OC)c1ccc(C=O)s1", "OCCO"], ["CCC1(c2ccc(C3OCCO3)s2)OCCO1"]], "confidence": [0.95, 0.7, 0.85, 0.75, 0.6]}
+{"mol_no": 7, "proposals": [["COc1ccccc1C1CCCCC1C=O"], ["C=C1CCCCC1c1ccccc1OC"], ["COc1ccccc1C1CCCCC1Br", "C=O"], ["COc1ccccc1B(O)O", "O=S(=O)(OC1CCCCC1CO)C(F)(F)F"]], "confidence": [0.8, 0.75, 0.7, 0.55]}
+{"mol_no": 9, "proposals": [["Cc1ccc(S(=O)(=O)c2ccc(F)cc2)cc1S(=O)(=O)Cl", "NC1CCNCC1"], ["Cc1ccc(S(=O)(=O)Cl)cc1S(=O)(=O)NC1CCNCC1", "Fc1ccccc1"], ["Cc1ccc(S(=O)O)cc1S(=O)(=O)NC1CCNCC1", "Fc1ccc(Br)cc1"], ["Cc1ccc(Sc2ccc(F)cc2)cc1S(=O)(=O)NC1CCNCC1"]], "confidence": [0.85, 0.6, 0.6, 0.85]}
+{"mol_no": 1, "proposals": [["CC(C)=CCBr", "Sc1ccc(Br)cc1"], ["CC(C)=CCO", "Sc1ccc(Br)cc1"], ["Brc1ccc(I)cc1", "CC(C)=CCS"], ["C=CC(=C)C", "Sc1ccc(Br)cc1"], ["CC(=O)OCC=C(C)C", "Sc1ccc(Br)cc1"]], "confidence": [0.9, 0.7, 0.75, 0.55, 0.65]}
+{"mol_no": 5, "proposals": [["CCCn1cc(CO)nc1C"], ["CCCn1cc(Br)nc1C"], ["CCCn1cc(C#N)nc1C"]], "confidence": [0.9, 0.85, 0.7]}
+{"mol_no": 4, "proposals": [["CCCCCCCCCCCCCCCCBr", "N#CCC(CN)CO"], ["CCCCCCCCCCCCCCCCOCC(CN)CCl", "[C-]#N.[Na+]"], ["CCCCCCCCCCCCCCCCOCC(C=O)CC#N", "N"], ["CCCCCCCCCCCCCCCCOCC(CN)CC(N)=O"]], "confidence": [0.7, 0.8, 0.6, 0.6]}
+{"mol_no": 6, "proposals": [], "confidence": []}
+{"mol_no": 3, "proposals": [], "confidence": []}
