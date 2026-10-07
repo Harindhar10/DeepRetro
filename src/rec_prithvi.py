@@ -16,6 +16,7 @@ def rec_run_prithvi(
         use_protecting_group_feature: bool = False,
         visited=None,
         depth=0,
+        local= False,
         max_depth=50) -> tuple[dict, bool]:
     """Recursive function to run Prithvi on a molecule
 
@@ -76,6 +77,7 @@ def rec_run_prithvi(
         out_pathways, out_explained, out_confidence = llm_pipeline(
             molecule=molecule,
             LLM=llm,
+            local = local,
             stability_flag=stability_flag,
             hallucination_check=hallucination_check,
             use_protecting_group_feature=use_protecting_group_feature)
