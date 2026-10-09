@@ -23,6 +23,11 @@ failed at the API (e.g. prompt + ``--max-output-tokens`` over vLLM's
 There is no strict JSON-schema decoding here, unlike the API eval: an answer
 that does not parse is filled with the train prior at scoring time and shows
 up as ``parse_fail_rate``/``fill_rate``. Scoring needs deepchem.
+
+``--perf`` records vLLM throughput/latency from the server's ``/metrics`` over
+the generation window into ``perf.json`` (and W&B with ``--wandb-project``).
+Every run logs in to W&B first with the required ``--wandb-api-key``, so a bad
+key fails before any generation.
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -44,6 +50,7 @@ for _path in (_REPO_ROOT, _REPO_ROOT.parent):  # DeepRetro, and DFS for the shar
 
 from deepretro.utils.llm import call_LLM  # noqa: E402
 from deepretro.utils.llm_interface import split_thinking  # noqa: E402
+from deepretro.utils.vllm_metrics import PerfRun, log_to_wandb  # noqa: E402
 from molnet.config import DATASETS, DEFAULT_SHOTS  # noqa: E402
 from molnet.evaluate import evaluate_run, load_results  # noqa: E402
 from molnet.prompts import build_messages, load_split, parse_response, system_text  # noqa: E402
@@ -93,6 +100,39 @@ def generate_one(args: argparse.Namespace, dataset: str, k: int, row: int, custo
     }
 
 
+def perf_window(args: argparse.Namespace) -> PerfRun | nullcontext:
+    """A :class:`PerfRun` on the vLLM server when ``--perf`` is set, else a no-op."""
+    if not args.perf:
+        return nullcontext()
+    return PerfRun(os.getenv("HOSTED_VLLM_API_BASE", "http://localhost:8000/v1"))
+
+
+def report_perf(args: argparse.Namespace, perf: PerfRun, run_dir: Path, n_requests: int) -> None:
+    """Write ``perf.json``, print the headline numbers and log the run to W&B."""
+    summary = perf.summary(n_requests)
+    with open(run_dir / "perf.json", "w") as f:
+        json.dump({"summary": summary, "gauge_samples": perf.samples}, f, indent=2)
+
+    def fmt(key: str, scale: float = 1.0, unit: str = "") -> str:
+        value = summary.get(key)
+        return "n/a" if value is None else f"{value * scale:.1f}{unit}"
+
+    print(f"perf: {fmt('output_tok_per_s')} out tok/s, {fmt('mol_per_s')} req/s | "
+          f"TTFT p50/p90 {fmt('ttft_p50_s', 1000)}/{fmt('ttft_p90_s', 1000, 'ms')} | "
+          f"TPOT p50/p90 {fmt('tpot_p50_s', 1000)}/{fmt('tpot_p90_s', 1000, 'ms')} | "
+          f"queue p90 {fmt('queue_p90_s', 1000, 'ms')}")
+    print(f"perf: running mean/max {fmt('running_mean')}/{fmt('running_max')}, "
+          f"waiting mean/max {fmt('waiting_mean')}/{fmt('waiting_max')}, "
+          f"KV max {fmt('kv_pct_max', unit='%')}, preemptions {fmt('preemptions')}")
+    if args.wandb_project:
+        config = {
+            "task": "molnet", "model": args.model, "thinking": args.thinking,
+            "max_output_tokens": args.max_output_tokens, "workers": args.workers,
+            "datasets": args.datasets, "shots": args.shots, "limit": args.limit, "tag": args.tag,
+        }
+        log_to_wandb(args.wandb_project, args.run_name, config, summary, perf.samples)
+
+
 def run_generation(args: argparse.Namespace, run_dir: Path) -> None:
     """Generate every request without a usable record, appending as each finishes."""
     results = load_results(run_dir)
@@ -104,7 +144,8 @@ def run_generation(args: argparse.Namespace, run_dir: Path) -> None:
 
     started = time.time()
     counts = {"ok": 0, "parse_error": 0, "api_error": 0}
-    with ThreadPoolExecutor(max_workers=args.workers) as pool, open(run_dir / "results.jsonl", "a") as fout:
+    with perf_window(args) as perf, ThreadPoolExecutor(max_workers=args.workers) as pool, \
+            open(run_dir / "results.jsonl", "a") as fout:
         futures = [pool.submit(generate_one, args, *r) for r in todo]
         for n, future in enumerate(as_completed(futures), start=1):
             rec = future.result()
@@ -117,6 +158,8 @@ def run_generation(args: argparse.Namespace, run_dir: Path) -> None:
     print(f"{len(todo)} requests in {elapsed / 60:.2f} min ({elapsed / len(todo):.2f} s/request): "
           f"{counts['ok']} ok, {counts['parse_error']} parse errors, "
           f"{counts['api_error']} API errors (re-run to retry)")
+    if perf is not None:
+        report_perf(args, perf, run_dir, counts["ok"] + counts["parse_error"])
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -133,11 +176,24 @@ def build_arg_parser() -> argparse.ArgumentParser:
                         help="default: 1024, or 16384 with --thinking")
     parser.add_argument("--workers", type=int, default=64, help="concurrent requests; vLLM batches them")
     parser.add_argument("--out-root", default=str(_REPO_ROOT / "results" / "molnet"))
+    parser.add_argument("--perf", action="store_true",
+                        help="record vLLM throughput/latency metrics from the server's /metrics "
+                             "into perf.json (server URL from HOSTED_VLLM_API_BASE)")
+    parser.add_argument("--wandb-api-key", required=True,
+                        help="W&B API key; the run logs in with it before generating")
+    parser.add_argument("--wandb-project", default=None,
+                        help="with --perf: also log the run to this W&B project")
+    parser.add_argument("--tag", default=None,
+                        help="with --perf: free-form label for the server setup, "
+                             "e.g. 'H100x2 tp2 max-num-seqs=256'")
     return parser
 
 
 def main(argv: list[str] | None = None) -> None:
     args = build_arg_parser().parse_args(argv)
+    import wandb
+
+    wandb.login(key=args.wandb_api_key, relogin=True, verify=True)
     args.datasets = args.datasets.split(",")
     unknown = [d for d in args.datasets if d not in DATASETS]
     if unknown:
