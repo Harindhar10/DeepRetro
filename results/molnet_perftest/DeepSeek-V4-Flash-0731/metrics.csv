@@ -1,0 +1,12 @@
+model,dataset,k,metric,value,n,tasks_scored,parse_fail_rate,fill_rate,input_tokens,cache_read_tokens,output_tokens,cost_usd
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,bace_classification,0,roc_auc,0.5310688405797102,152,1,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,bace_regression,0,rmse,1.4582076822254595,152,1,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,bbbp,0,roc_auc,0.6514606741573035,189,1,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,clearance,0,rmse,75.89061633442601,84,1,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,clintox,0,roc_auc,0.49084527238494247,143,2,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,delaney,0,rmse,1.0427188635095197,113,1,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,freesolv,0,rmse,5.689582175309991,65,1,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,hiv,0,roc_auc,0.4854572298062405,4102,1,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,lipo,0,rmse,1.0209000464109623,420,1,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,sider,0,roc_auc,0.528672523485946,127,27,0.0,0.0,0,0,0,
+hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731,tox21,0,roc_auc,0.5383687993322404,762,12,0.0,0.0,0,0,0,

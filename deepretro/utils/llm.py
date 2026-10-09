@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 from typing import Any, cast
 
 import litellm
@@ -39,6 +40,7 @@ load_dotenv()
 
 # litellm.success_callback = ["langfuse"]
 litellm.callbacks = ["langfuse_otel"]
+os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "false"  # no raw_gen_ai_request spans
 litellm.drop_params = True
 
 logger = structlog.get_logger(__name__)

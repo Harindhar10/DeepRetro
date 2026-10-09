@@ -39,6 +39,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,19 @@ from deepretro.utils.vllm_metrics import PerfRun, log_to_wandb  # noqa: E402
 from molnet.config import DATASETS, DEFAULT_SHOTS  # noqa: E402
 from molnet.evaluate import evaluate_run, load_results  # noqa: E402
 from molnet.prompts import build_messages, load_split, parse_response, system_text  # noqa: E402
+import deepretro.utils.llm_interface as llm_interface  # noqa: E402
+
+# call_LLM takes no Langfuse metadata, so wrap the function DeepRetro builds every completion's
+# metadata with and merge in this query's keys (read by litellm's langfuse_otel callback).
+_query_metadata: ContextVar[dict[str, Any]] = ContextVar("query_metadata", default={})
+_deepretro_langfuse_metadata = llm_interface.langfuse_metadata
+
+
+def _langfuse_metadata(base: dict[str, Any] | None, *, stage: str) -> dict[str, Any]:
+    return {**_deepretro_langfuse_metadata(base, stage=stage), **_query_metadata.get()}
+
+
+llm_interface.langfuse_metadata = _langfuse_metadata
 
 
 def build_requests(args: argparse.Namespace) -> list[tuple[str, int, int, str]]:
@@ -75,6 +89,11 @@ def generate_one(args: argparse.Namespace, dataset: str, k: int, row: int, custo
     smiles = load_split(dataset, args.split).loc[row, "smiles"]
     # vLLM and DeepRetro's ChatMessage take string content, not text parts.
     messages = [{"role": "system", "content": system_text(messages)}, messages[1]]
+    _query_metadata.set({
+        "session_id": args.run_name, "trace_name": f"{dataset}/k{k}", "generation_name": "predict",
+        "tags": [args.model, dataset, f"k={k}", "local"],
+        "trace_metadata": {"dataset": dataset, "k": k, "row": row}, "dataset": dataset,
+    })
     status, text = call_LLM(
         smiles,
         model=args.model,
