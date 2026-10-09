@@ -18,6 +18,7 @@ dependencies = [
     "pandas",
     "rdkit",
     "requests",
+    "prometheus-client",
     "boto3",
     "azure-ai-ml",
     "together",
@@ -30,6 +31,9 @@ docs = [
     "sphinx-rtd-theme>=1.0.0",
     "sphinx-autodoc-typehints>=1.19.5",
     "myst-parser>=0.18.0"
+]
+perf = [
+    "wandb"
 ]
 
 [project.urls]

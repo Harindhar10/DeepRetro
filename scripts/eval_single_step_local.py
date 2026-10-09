@@ -52,6 +52,7 @@ import os
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +80,7 @@ from deepretro.utils.one_step_eval import (  # noqa: E402
 )
 
 from deepretro.utils.utils_molecule import canonicalize  # noqa: E402
+from deepretro.utils.vllm_metrics import PerfRun, log_to_wandb  # noqa: E402
 
 AUTOSOLVE_VIEWS = ("hybrid", "az", "llm")
 # A retro-synthesis prompt from the futurehouse/ether0-benchmark dataset.
@@ -129,6 +131,38 @@ def generate_one(args: argparse.Namespace, smiles: str) -> dict[str, Any]:
     return {"proposals": pathways, "status": 200 if pathways else 504}
 
 
+def perf_window(args: argparse.Namespace) -> PerfRun | nullcontext:
+    """A :class:`PerfRun` on the vLLM server when ``--perf`` is set, else a no-op."""
+    if not args.perf:
+        return nullcontext()
+    return PerfRun(os.getenv("HOSTED_VLLM_API_BASE", "http://localhost:8000/v1"))
+
+
+def report_perf(args: argparse.Namespace, perf: PerfRun, out_dir: str, n_molecules: int) -> None:
+    """Write ``perf.json``, print the headline numbers and log the run to W&B."""
+    summary = perf.summary(n_molecules)
+    with open(os.path.join(out_dir, "perf.json"), "w") as f:
+        json.dump({"summary": summary, "gauge_samples": perf.samples}, f, indent=2)
+
+    def fmt(key: str, scale: float = 1.0, unit: str = "") -> str:
+        value = summary.get(key)
+        return "n/a" if value is None else f"{value * scale:.1f}{unit}"
+
+    print(f"perf: {fmt('output_tok_per_s')} out tok/s, {fmt('mol_per_s')} mol/s | "
+          f"TTFT p50/p90 {fmt('ttft_p50_s', 1000)}/{fmt('ttft_p90_s', 1000, 'ms')} | "
+          f"TPOT p50/p90 {fmt('tpot_p50_s', 1000)}/{fmt('tpot_p90_s', 1000, 'ms')} | "
+          f"queue p90 {fmt('queue_p90_s', 1000, 'ms')}")
+    print(f"perf: running mean/max {fmt('running_mean')}/{fmt('running_max')}, "
+          f"waiting mean/max {fmt('waiting_mean')}/{fmt('waiting_max')}, "
+          f"KV max {fmt('kv_pct_max', unit='%')}, preemptions {fmt('preemptions')}")
+    if args.wandb_project:
+        config = {
+            "model": args.model, "mode": args.mode, "workers": args.workers,
+            "thinking": args.thinking, "max_output_tokens": args.max_output_tokens, "tag": args.tag,
+        }
+        log_to_wandb(args.wandb_project, Path(out_dir).name, config, summary, perf.samples)
+
+
 def run_generation(args: argparse.Namespace, df: pd.DataFrame, jsonl: str) -> None:
     """Generate for every molecule not yet in ``jsonl``, appending as each finishes."""
     done = load_checkpoint(jsonl)
@@ -141,7 +175,8 @@ def run_generation(args: argparse.Namespace, df: pd.DataFrame, jsonl: str) -> No
 
     started = time.time()
     failed = 0
-    with ThreadPoolExecutor(max_workers=args.workers) as pool, open(jsonl, "a") as fout:
+    with perf_window(args) as perf, ThreadPoolExecutor(max_workers=args.workers) as pool, \
+            open(jsonl, "a") as fout:
         futures = {pool.submit(generate_one, args, row["input"]): (i, row) for i, row in todo}
         for n, future in enumerate(as_completed(futures), start=1):
             i, row = futures[future]
@@ -166,6 +201,8 @@ def run_generation(args: argparse.Namespace, df: pd.DataFrame, jsonl: str) -> No
         f"{len(todo)} molecules in {elapsed / 60:.2f} min "
         f"({elapsed / len(todo):.2f} s/mol), {failed} API failures (re-run to retry)"
     )
+    if perf is not None:
+        report_perf(args, perf, os.path.dirname(jsonl), len(todo) - failed)
 
 
 def _pending(df: pd.DataFrame, done: dict[int, Any], limit: int | None) -> list[tuple[int, Any]]:
@@ -213,7 +250,8 @@ def run_llm_step(args: argparse.Namespace, df: pd.DataFrame, jsonl: str) -> None
         max_output_tokens=args.max_output_tokens,
     )
     started = time.time()
-    with ThreadPoolExecutor(max_workers=args.workers) as pool, open(jsonl, "a") as fout:
+    with perf_window(args) as perf, ThreadPoolExecutor(max_workers=args.workers) as pool, \
+            open(jsonl, "a") as fout:
         futures = {pool.submit(solver.run_llm, canonicalize(row["input"])): i for i, row in todo}
         for n, future in enumerate(as_completed(futures), start=1):
             pathways, _explanations, confidence = future.result()
@@ -224,6 +262,8 @@ def run_llm_step(args: argparse.Namespace, df: pd.DataFrame, jsonl: str) -> None
             if n % 25 == 0:
                 print(f"  [llm] {n}/{len(todo)}")
     print(f"[llm] {len(todo)} molecules in {(time.time() - started) / 60:.2f} min")
+    if perf is not None:
+        report_perf(args, perf, os.path.dirname(jsonl), len(todo))
 
 
 def run_az_step(args: argparse.Namespace, df: pd.DataFrame, jsonl: str) -> None:
@@ -375,6 +415,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stability-check", action="store_true", help="pipeline/autosolve modes")
     parser.add_argument("--hallucination-check", action="store_true", help="pipeline/autosolve modes")
     parser.add_argument("--out-root", default=str(_REPO_ROOT / "results"))
+    parser.add_argument("--perf", action="store_true",
+                        help="record vLLM throughput/latency metrics from the server's /metrics "
+                             "into perf.json (server URL from HOSTED_VLLM_API_BASE)")
+    parser.add_argument("--wandb-project", default=None,
+                        help="with --perf: also log the run to this W&B project")
+    parser.add_argument("--tag", default=None,
+                        help="with --perf: free-form label for the server setup, "
+                             "e.g. 'H100x2 tp2 max-num-seqs=256'")
     return parser
 
 
