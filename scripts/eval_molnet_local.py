@@ -25,8 +25,9 @@ that does not parse is filled with the train prior at scoring time and shows
 up as ``parse_fail_rate``/``fill_rate``. Scoring needs deepchem.
 
 ``--perf`` records vLLM throughput/latency from the server's ``/metrics`` over
-the generation window into ``perf.json`` (and W&B with ``--wandb-project``).
-Every run logs in to W&B first with the required ``--wandb-api-key``, so a bad
+the generation window into ``perf.json``. The perf data and, when ``--limit``
+is not set, the scores are logged to one W&B run in a project named after the
+model. Every run logs in to W&B first with the required ``--wandb-api-key``, so a bad
 key fails before any generation.
 """
 
@@ -39,9 +40,12 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+import pandas as pd
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 for _path in (_REPO_ROOT, _REPO_ROOT.parent):  # DeepRetro, and DFS for the shared molnet package
@@ -50,10 +54,23 @@ for _path in (_REPO_ROOT, _REPO_ROOT.parent):  # DeepRetro, and DFS for the shar
 
 from deepretro.utils.llm import call_LLM  # noqa: E402
 from deepretro.utils.llm_interface import split_thinking  # noqa: E402
-from deepretro.utils.vllm_metrics import PerfRun, log_to_wandb  # noqa: E402
+from deepretro.utils.vllm_metrics import PerfRun  # noqa: E402
 from molnet.config import DATASETS, DEFAULT_SHOTS  # noqa: E402
 from molnet.evaluate import evaluate_run, load_results  # noqa: E402
 from molnet.prompts import build_messages, load_split, parse_response, system_text  # noqa: E402
+import deepretro.utils.llm_interface as llm_interface  # noqa: E402
+
+# call_LLM takes no Langfuse metadata, so wrap the function DeepRetro builds every completion's
+# metadata with and merge in this query's keys (read by litellm's langfuse_otel callback).
+_query_metadata: ContextVar[dict[str, Any]] = ContextVar("query_metadata", default={})
+_deepretro_langfuse_metadata = llm_interface.langfuse_metadata
+
+
+def _langfuse_metadata(base: dict[str, Any] | None, *, stage: str) -> dict[str, Any]:
+    return {**_deepretro_langfuse_metadata(base, stage=stage), **_query_metadata.get()}
+
+
+llm_interface.langfuse_metadata = _langfuse_metadata
 
 
 def build_requests(args: argparse.Namespace) -> list[tuple[str, int, int, str]]:
@@ -75,6 +92,11 @@ def generate_one(args: argparse.Namespace, dataset: str, k: int, row: int, custo
     smiles = load_split(dataset, args.split).loc[row, "smiles"]
     # vLLM and DeepRetro's ChatMessage take string content, not text parts.
     messages = [{"role": "system", "content": system_text(messages)}, messages[1]]
+    _query_metadata.set({
+        "session_id": args.run_name, "trace_name": f"{dataset}/k{k}", "generation_name": "predict",
+        "tags": [args.model, dataset, f"k={k}", "local"],
+        "trace_metadata": {"dataset": dataset, "k": k, "row": row}, "dataset": dataset,
+    })
     status, text = call_LLM(
         smiles,
         model=args.model,
@@ -107,8 +129,8 @@ def perf_window(args: argparse.Namespace) -> PerfRun | nullcontext:
     return PerfRun(os.getenv("HOSTED_VLLM_API_BASE", "http://localhost:8000/v1"))
 
 
-def report_perf(args: argparse.Namespace, perf: PerfRun, run_dir: Path, n_requests: int) -> None:
-    """Write ``perf.json``, print the headline numbers and log the run to W&B."""
+def report_perf(perf: PerfRun, run_dir: Path, n_requests: int) -> dict[str, Any]:
+    """Write ``perf.json``, print the headline numbers and return the perf summary."""
     summary = perf.summary(n_requests)
     with open(run_dir / "perf.json", "w") as f:
         json.dump({"summary": summary, "gauge_samples": perf.samples}, f, indent=2)
@@ -124,23 +146,50 @@ def report_perf(args: argparse.Namespace, perf: PerfRun, run_dir: Path, n_reques
     print(f"perf: running mean/max {fmt('running_mean')}/{fmt('running_max')}, "
           f"waiting mean/max {fmt('waiting_mean')}/{fmt('waiting_max')}, "
           f"KV max {fmt('kv_pct_max', unit='%')}, preemptions {fmt('preemptions')}")
-    if args.wandb_project:
-        config = {
-            "task": "molnet", "model": args.model, "thinking": args.thinking,
-            "max_output_tokens": args.max_output_tokens, "workers": args.workers,
-            "datasets": args.datasets, "shots": args.shots, "limit": args.limit, "tag": args.tag,
-        }
-        log_to_wandb(args.wandb_project, args.run_name, config, summary, perf.samples)
+    return summary
 
 
-def run_generation(args: argparse.Namespace, run_dir: Path) -> None:
-    """Generate every request without a usable record, appending as each finishes."""
+def log_wandb(args: argparse.Namespace, metrics: pd.DataFrame,
+              perf: tuple[dict[str, Any], list[dict[str, Any]]] | None) -> None:
+    """Log the scores, and the perf gauges/summary if any, to one W&B run. Never raises."""
+    config = {
+        "task": "molnet", "model": args.model, "thinking": args.thinking,
+        "max_output_tokens": args.max_output_tokens, "workers": args.workers,
+        "datasets": args.datasets, "shots": args.shots, "limit": args.limit, "tag": args.tag,
+    }
+    try:
+        import wandb
+
+        run = wandb.init(project=args.wandb_project, name=args.run_name, config=config)
+        if perf is not None:
+            summary, samples = perf
+            for sample in samples:
+                run.log({k: v for k, v in sample.items() if k != "t" and v is not None}
+                        | {"elapsed_s": sample["t"]})
+            run.summary.update({k: v for k, v in summary.items() if v is not None})
+        if not metrics.empty:
+            run.log({"metrics": wandb.Table(dataframe=metrics)})
+            for row in metrics.itertuples():
+                prefix = f"{row.dataset}/k{row.k}"
+                run.summary.update({f"{prefix}/{row.metric}": row.value,
+                                    f"{prefix}/parse_fail_rate": row.parse_fail_rate,
+                                    f"{prefix}/fill_rate": row.fill_rate})
+        run.finish()
+    except Exception as exc:
+        print(f"W&B logging failed: {exc}")
+
+
+def run_generation(args: argparse.Namespace, run_dir: Path) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
+    """Generate every request without a usable record, appending as each finishes.
+
+    Returns ``(perf summary, gauge samples)`` when ``--perf`` recorded a window, else ``None``.
+    """
     results = load_results(run_dir)
     done = set() if results.empty else set(results.loc[results["status"] != "api_error", "custom_id"])
     todo = [r for r in build_requests(args) if r[3] not in done]
     print(f"{len(done)} already done, generating {len(todo)}")
     if not todo:
-        return
+        return None
 
     started = time.time()
     counts = {"ok": 0, "parse_error": 0, "api_error": 0}
@@ -158,8 +207,9 @@ def run_generation(args: argparse.Namespace, run_dir: Path) -> None:
     print(f"{len(todo)} requests in {elapsed / 60:.2f} min ({elapsed / len(todo):.2f} s/request): "
           f"{counts['ok']} ok, {counts['parse_error']} parse errors, "
           f"{counts['api_error']} API errors (re-run to retry)")
-    if perf is not None:
-        report_perf(args, perf, run_dir, counts["ok"] + counts["parse_error"])
+    if perf is None:
+        return None
+    return report_perf(perf, run_dir, counts["ok"] + counts["parse_error"]), perf.samples
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -181,10 +231,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
                              "into perf.json (server URL from HOSTED_VLLM_API_BASE)")
     parser.add_argument("--wandb-api-key", required=True,
                         help="W&B API key; the run logs in with it before generating")
-    parser.add_argument("--wandb-project", default=None,
-                        help="with --perf: also log the run to this W&B project")
     parser.add_argument("--tag", default=None,
-                        help="with --perf: free-form label for the server setup, "
+                        help="free-form W&B label for the server setup, "
                              "e.g. 'H100x2 tp2 max-num-seqs=256'")
     return parser
 
@@ -203,17 +251,21 @@ def main(argv: list[str] | None = None) -> None:
         args.max_output_tokens = 16384 if args.thinking else 1024
 
     model_slug = args.model.rstrip("/").split("/")[-1]
+    args.wandb_project = model_slug
     args.run_name = f"{model_slug}{'_think' if args.thinking else ''}"
     run_dir = Path(args.out_root) / args.run_name
     os.makedirs(run_dir, exist_ok=True)
     print(f"writing to {run_dir}")
 
-    run_generation(args, run_dir)
+    perf = run_generation(args, run_dir)
     metrics = evaluate_run(run_dir, args.split)
-    if metrics.empty:
-        return
-    metrics.to_csv(run_dir / "metrics.csv", index=False)
-    print(f"\nwrote {run_dir / 'metrics.csv'}")
+    if not metrics.empty:
+        metrics.to_csv(run_dir / "metrics.csv", index=False)
+        print(f"\nwrote {run_dir / 'metrics.csv'}")
+    # Scores on a --limit sample are quick checks; only full test-set scores go to W&B.
+    scores = metrics if args.limit is None else pd.DataFrame()
+    if perf is not None or not scores.empty:
+        log_wandb(args, scores, perf)
 
 
 if __name__ == "__main__":
