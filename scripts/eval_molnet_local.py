@@ -25,9 +25,8 @@ that does not parse is filled with the train prior at scoring time and shows
 up as ``parse_fail_rate``/``fill_rate``. Scoring needs deepchem.
 
 ``--perf`` records vLLM throughput/latency from the server's ``/metrics`` over
-the generation window into ``perf.json``. The perf data and, when ``--limit``
-is not set, the scores are logged to one W&B run in a project named
-``Molnet-<model slug>``. Every run logs in to W&B first with the required ``--wandb-api-key``, so a bad
+the generation window into ``perf.json``. The scores and perf data are logged
+to one W&B run, named after the model, in the ``Molnet_local_llm`` project. Every run logs in to W&B first with the required ``--wandb-api-key``, so a bad
 key fails before any generation.
 """
 
@@ -160,7 +159,7 @@ def log_wandb(args: argparse.Namespace, metrics: pd.DataFrame,
     try:
         import wandb
 
-        run = wandb.init(project=args.wandb_project, name=args.run_name, config=config)
+        run = wandb.init(project=args.wandb_project, name=args.wandb_run_name, config=config)
         if perf is not None:
             summary, samples = perf
             for sample in samples:
@@ -251,7 +250,8 @@ def main(argv: list[str] | None = None) -> None:
         args.max_output_tokens = 16384 if args.thinking else 1024
 
     model_slug = args.model.rstrip("/").split("/")[-1]
-    args.wandb_project = f"Molnet-{model_slug}"
+    args.wandb_project = "Molnet_local_llm"
+    args.wandb_run_name = model_slug
     args.run_name = f"{model_slug}{'_think' if args.thinking else ''}"
     run_dir = Path(args.out_root) / args.run_name
     os.makedirs(run_dir, exist_ok=True)
@@ -262,10 +262,7 @@ def main(argv: list[str] | None = None) -> None:
     if not metrics.empty:
         metrics.to_csv(run_dir / "metrics.csv", index=False)
         print(f"\nwrote {run_dir / 'metrics.csv'}")
-    # Scores on a --limit sample are quick checks; only full test-set scores go to W&B.
-    scores = metrics if args.limit is None else pd.DataFrame()
-    if perf is not None or not scores.empty:
-        log_wandb(args, scores, perf)
+    log_wandb(args, metrics, perf)
 
 
 if __name__ == "__main__":
