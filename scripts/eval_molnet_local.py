@@ -26,8 +26,8 @@ up as ``parse_fail_rate``/``fill_rate``. Scoring needs deepchem.
 
 ``--perf`` records vLLM throughput/latency from the server's ``/metrics`` over
 the generation window into ``perf.json``. The perf data and, when ``--limit``
-is not set, the scores are logged to one W&B run in a project named after the
-model. Every run logs in to W&B first with the required ``--wandb-api-key``, so a bad
+is not set, the scores are logged to one W&B run in a project named
+``Molnet-<model slug>``. Every run logs in to W&B first with the required ``--wandb-api-key``, so a bad
 key fails before any generation.
 """
 
@@ -251,7 +251,7 @@ def main(argv: list[str] | None = None) -> None:
         args.max_output_tokens = 16384 if args.thinking else 1024
 
     model_slug = args.model.rstrip("/").split("/")[-1]
-    args.wandb_project = model_slug
+    args.wandb_project = f"Molnet-{model_slug}"
     args.run_name = f"{model_slug}{'_think' if args.thinking else ''}"
     run_dir = Path(args.out_root) / args.run_name
     os.makedirs(run_dir, exist_ok=True)
