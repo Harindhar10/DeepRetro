@@ -115,6 +115,15 @@ LOCAL_STOP_SEQUENCES = ["</json>"]
 LOCAL_THINKING_MIN_TEMPERATURE = 0.6
 LOCAL_THINKING_TOP_P = 0.95
 LOCAL_THINKING_TOP_K = 20
+# Qwen3.8's chat template reads ``reasoning_effort`` as low|medium|xhigh and
+# defaults to xhigh; an unknown level falls back silently, so map every
+# ThinkingEffort explicitly rather than passing it through.
+LOCAL_EFFORT_LEVELS: dict[str, str] = {
+    "low": "low",
+    "medium": "medium",
+    "high": "xhigh",
+    "max": "xhigh",
+}
 
 
 @dataclass(frozen=True)
@@ -716,6 +725,12 @@ def build_completion_params(
     (0.0, {'enable_thinking': False, 'thinking': False})
     >>> "reasoning_effort" in params
     False
+    >>> params = build_completion_params(
+    ...     "hosted_vllm/Qwen/Qwen3.8-27B", messages, 1024, 0.0,
+    ...     thinking_effort="high",
+    ... )
+    >>> params["extra_body"]["chat_template_kwargs"]["reasoning_effort"]
+    'xhigh'
     """
     selection = resolve_model_selection(model)
     output_token_limit = resolve_output_token_limit(
@@ -744,21 +759,26 @@ def build_completion_params(
     if enable_thinking and selection.supports_reasoning_effort:
         params["reasoning_effort"] = thinking_effort
     if selection.provider == "local":
-        params.update(build_local_params(temperature, enable_thinking))
+        params.update(build_local_params(temperature, enable_thinking, thinking_effort))
 
     return params
 
 
-def build_local_params(temperature: float, enable_thinking: bool) -> dict[str, Any]:
+def build_local_params(
+    temperature: float,
+    enable_thinking: bool,
+    thinking_effort: ThinkingEffort = "medium",
+) -> dict[str, Any]:
     """Return the extra ``litellm.completion`` arguments for a local vLLM server.
 
     ``chat_template_kwargs`` carries the chat template's thinking switch under
     both names in use (Qwen3/GLM read ``enable_thinking``, DeepSeek V4 reads
-    ``thinking``; templates ignore keys they don't use). ``stop`` and
-    ``include_stop_str_in_output`` are vLLM sampling parameters passed through
-    ``extra_body``. With thinking on, sampling follows Qwen's recommendation,
-    so the temperature is raised to at least
-    :data:`LOCAL_THINKING_MIN_TEMPERATURE`.
+    ``thinking``; templates ignore keys they don't use). With thinking on it
+    also carries ``reasoning_effort``, mapped through
+    :data:`LOCAL_EFFORT_LEVELS`. ``stop`` and ``include_stop_str_in_output``
+    are vLLM sampling parameters passed through ``extra_body``. With thinking
+    on, sampling follows Qwen's recommendation, so the temperature is raised
+    to at least :data:`LOCAL_THINKING_MIN_TEMPERATURE`.
 
     Parameters
     ----------
@@ -766,6 +786,8 @@ def build_local_params(temperature: float, enable_thinking: bool) -> dict[str, A
         Requested sampling temperature.
     enable_thinking : bool
         Whether the chat template should open a thinking block.
+    thinking_effort : {"low", "medium", "high", "max"}, optional
+        Reasoning effort; sent only when thinking is on.
 
     Returns
     -------
@@ -779,13 +801,17 @@ def build_local_params(temperature: float, enable_thinking: bool) -> dict[str, A
     (0.6, 20)
     >>> build_local_params(0.2, enable_thinking=False)["temperature"]
     0.2
+    >>> build_local_params(0.0, True, "max")["extra_body"]["chat_template_kwargs"]
+    {'enable_thinking': True, 'thinking': True, 'reasoning_effort': 'xhigh'}
     """
+    template_kwargs: dict[str, Any] = {"enable_thinking": enable_thinking, "thinking": enable_thinking}
     extra_body: dict[str, Any] = {
-        "chat_template_kwargs": {"enable_thinking": enable_thinking, "thinking": enable_thinking},
+        "chat_template_kwargs": template_kwargs,
         "stop": list(LOCAL_STOP_SEQUENCES),
         "include_stop_str_in_output": True,
     }
     if enable_thinking:
+        template_kwargs["reasoning_effort"] = LOCAL_EFFORT_LEVELS[thinking_effort]
         temperature = max(temperature, LOCAL_THINKING_MIN_TEMPERATURE)
         extra_body.update(top_p=LOCAL_THINKING_TOP_P, top_k=LOCAL_THINKING_TOP_K)
     return {

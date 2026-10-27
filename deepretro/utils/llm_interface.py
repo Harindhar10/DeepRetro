@@ -7,6 +7,7 @@ import re
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 import structlog
 from litellm import completion
@@ -107,16 +108,25 @@ class LLMResponse:
         Status code for the call. ``200`` means success.
     text : str
         Response text or final error message.
+    reasoning : str
+        Thinking text the server returned separately (vLLM's
+        ``--reasoning-parser`` puts it in ``reasoning_content``). Empty when
+        the server returns none, in which case any trace is still in ``text``.
+    reasoning_tokens : int or None
+        Reasoning token count from the usage block, or ``None`` when the
+        server does not report one.
 
     Examples
     --------
     >>> response = LLMResponse(status_code=200, text="OK")
-    >>> (response.status_code, response.text)
-    (200, 'OK')
+    >>> (response.status_code, response.text, response.reasoning)
+    (200, 'OK', '')
     """
 
     status_code: int
     text: str
+    reasoning: str = ""
+    reasoning_tokens: int | None = None
 
 
 def build_addon_prompt(molecule: str) -> str:
@@ -312,8 +322,9 @@ class LLMInterface(ABC):
             started = time.perf_counter()
             try:
                 response = completion(**params)
-                content = response.choices[0].message.content
-                response_text = coerce_response_text(content)
+                message = response.choices[0].message
+                response_text = coerce_response_text(message.content)
+                reasoning = coerce_response_text(getattr(message, "reasoning_content", None))
                 record_llm_call(
                     stage="retrosynthesis",
                     model=self.selection.completion_model,
@@ -326,7 +337,12 @@ class LLMInterface(ABC):
                 logger.debug(
                     "Received LLM response", response_length=len(response_text)
                 )
-                return LLMResponse(status_code=200, text=response_text)
+                return LLMResponse(
+                    status_code=200,
+                    text=response_text,
+                    reasoning=reasoning,
+                    reasoning_tokens=reasoning_token_count(response),
+                )
             except Exception as exc:
                 last_error = str(exc)
                 record_llm_call(
@@ -567,6 +583,33 @@ def parse_reaction_answer(response_text: str) -> tuple[int, list[str], str]:
         "confidence_scores": [1.0],
     })
     return 200, [thinking] if thinking else [], payload
+
+
+def reasoning_token_count(response: Any) -> int | None:
+    """Return the reasoning token count from a completion's usage block.
+
+    Parameters
+    ----------
+    response : Any
+        A LiteLLM completion response.
+
+    Returns
+    -------
+    int or None
+        ``usage.completion_tokens_details.reasoning_tokens``, or ``None`` when
+        the server leaves it out (many vLLM versions do).
+
+    Examples
+    --------
+    >>> from types import SimpleNamespace as NS
+    >>> reasoning_token_count(NS(usage=NS(completion_tokens_details=NS(reasoning_tokens=7))))
+    7
+    >>> reasoning_token_count(NS(usage=None)) is None
+    True
+    """
+    details = getattr(getattr(response, "usage", None), "completion_tokens_details", None)
+    count = getattr(details, "reasoning_tokens", None)
+    return count if isinstance(count, int) else None
 
 
 def split_thinking(response_text: str) -> tuple[str, str]:

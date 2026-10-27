@@ -4,7 +4,7 @@
 The local-model counterpart of ``Claude_GPT_eval/run_eval.py``: same datasets,
 prompts, in-context examples, ``--limit`` sample and ROC-AUC/RMSE scoring (all
 from the shared ``molnet`` package in the DFS folder), but every request goes
-through ``deepretro.utils.llm.call_LLM`` to a vLLM OpenAI-compatible server.
+through DeepRetro's LLM interface to a vLLM OpenAI-compatible server.
 Start the server first, e.g.::
 
     vllm serve zai-org/GLM-4.7-Flash --dtype bfloat16 --max-model-len 17408
@@ -14,6 +14,12 @@ then::
     HOSTED_VLLM_API_BASE=http://localhost:8000/v1 \\
     python scripts/eval_molnet_local.py \\
         --model hosted_vllm/zai-org/GLM-4.7-Flash --no-thinking --limit 50
+
+For thinking runs, serve with ``--reasoning-parser`` (``qwen3`` for Qwen) so
+the trace comes back in its own ``reasoning_content`` field; without it the
+trace is split off the inline ``<think>`` block instead. ``--thinking-effort``
+sets the chat template's ``reasoning_effort`` (Qwen3.8 defaults to its most
+verbose level), and each level writes to its own run directory.
 
 Generation is resumable: requests with a usable record in ``results.jsonl``
 are skipped, so an interrupted run can simply be restarted. Requests that
@@ -51,15 +57,15 @@ for _path in (_REPO_ROOT, _REPO_ROOT.parent):  # DeepRetro, and DFS for the shar
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
-from deepretro.utils.llm import call_LLM  # noqa: E402
-from deepretro.utils.llm_interface import split_thinking  # noqa: E402
+import deepretro.utils.llm  # noqa: E402,F401 -- loads .env and registers the langfuse_otel callback
+from deepretro.utils.llm_interface import LLMRequest, create_llm_interface, split_thinking  # noqa: E402
 from deepretro.utils.vllm_metrics import PerfRun  # noqa: E402
 from molnet.config import DATASETS, DEFAULT_SHOTS  # noqa: E402
 from molnet.evaluate import evaluate_run, load_results  # noqa: E402
 from molnet.prompts import build_messages, load_split, parse_response, system_text  # noqa: E402
 import deepretro.utils.llm_interface as llm_interface  # noqa: E402
 
-# call_LLM takes no Langfuse metadata, so wrap the function DeepRetro builds every completion's
+# The LLM interface takes no Langfuse metadata, so wrap the function DeepRetro builds every completion's
 # metadata with and merge in this query's keys (read by litellm's langfuse_otel callback).
 _query_metadata: ContextVar[dict[str, Any]] = ContextVar("query_metadata", default={})
 _deepretro_langfuse_metadata = llm_interface.langfuse_metadata
@@ -96,27 +102,40 @@ def generate_one(args: argparse.Namespace, dataset: str, k: int, row: int, custo
         "tags": [args.model, dataset, f"k={k}", "local"],
         "trace_metadata": {"dataset": dataset, "k": k, "row": row}, "dataset": dataset,
     })
-    status, text = call_LLM(
-        smiles,
+    # call_LLM returns only (status, text); call the interface for the separate trace and its usage.
+    response = create_llm_interface(args.model).call(LLMRequest(
+        molecule=smiles,
         model=args.model,
         messages=messages,
         temperature=0.0,
         enable_thinking=args.thinking,
+        thinking_effort=args.thinking_effort,
         max_output_tokens=args.max_output_tokens,
-    )
-    if status != 200:
+    ))
+    text, reasoning = response.text, response.reasoning
+    if response.status_code != 200:
         predictions, rec_status, error = {}, "api_error", text
     else:
-        # Parse only the answer: the JSON regex is greedy and would span braces in the thinking.
-        _, answer = split_thinking(text)
-        predictions, error = parse_response(dataset, answer)
-        rec_status = "ok" if error is None else "parse_error"
+        if not reasoning:
+            # Server without --reasoning-parser: the trace is still inline. Split it off, since
+            # the JSON regex is greedy and would span braces in the thinking.
+            reasoning, text = split_thinking(text)
+        predictions, error = parse_response(dataset, text)
+        if error is None:
+            rec_status = "ok"
+        elif reasoning and not text.strip():
+            rec_status = "truncated"  # the token cap ended the trace before any answer
+        else:
+            rec_status = "parse_error"
     return {
         "run_id": args.run_name, "model": args.model, "provider": "local", "mode": "local",
-        "thinking": args.thinking, "dataset": dataset, "k": k, "row": row, "custom_id": custom_id,
-        "text": text, "predictions": predictions, "status": rec_status, "error": error,
-        "stop_reason": None, "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0,
-        "cache_write_tokens": 0, "reasoning_tokens": 0, "cost_usd": None,
+        "thinking": args.thinking, "thinking_effort": args.thinking_effort if args.thinking else None,
+        "dataset": dataset, "k": k, "row": row, "custom_id": custom_id,
+        "text": text, "reasoning": reasoning, "predictions": predictions, "status": rec_status,
+        "error": error, "stop_reason": None, "input_tokens": 0, "output_tokens": 0,
+        "cache_read_tokens": 0, "cache_write_tokens": 0,
+        "reasoning_tokens": response.reasoning_tokens, "reasoning_chars": len(reasoning),
+        "cost_usd": None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -153,6 +172,7 @@ def log_wandb(args: argparse.Namespace, metrics: pd.DataFrame,
     """Log the scores, and the perf gauges/summary if any, to one W&B run. Never raises."""
     config = {
         "task": "molnet", "model": args.model, "thinking": args.thinking,
+        "thinking_effort": args.thinking_effort if args.thinking else None,
         "max_output_tokens": args.max_output_tokens, "workers": args.workers,
         "datasets": args.datasets, "shots": args.shots, "limit": args.limit, "tag": args.tag,
     }
@@ -191,7 +211,7 @@ def run_generation(args: argparse.Namespace, run_dir: Path) -> tuple[dict[str, A
         return None
 
     started = time.time()
-    counts = {"ok": 0, "parse_error": 0, "api_error": 0}
+    counts = {"ok": 0, "parse_error": 0, "truncated": 0, "api_error": 0}
     with perf_window(args) as perf, ThreadPoolExecutor(max_workers=args.workers) as pool, \
             open(run_dir / "results.jsonl", "a") as fout:
         futures = [pool.submit(generate_one, args, *r) for r in todo]
@@ -205,10 +225,12 @@ def run_generation(args: argparse.Namespace, run_dir: Path) -> tuple[dict[str, A
     elapsed = time.time() - started
     print(f"{len(todo)} requests in {elapsed / 60:.2f} min ({elapsed / len(todo):.2f} s/request): "
           f"{counts['ok']} ok, {counts['parse_error']} parse errors, "
+          f"{counts['truncated']} truncated in thinking, "
           f"{counts['api_error']} API errors (re-run to retry)")
     if perf is None:
         return None
-    return report_perf(perf, run_dir, counts["ok"] + counts["parse_error"]), perf.samples
+    completed = counts["ok"] + counts["parse_error"] + counts["truncated"]
+    return report_perf(perf, run_dir, completed), perf.samples
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -221,6 +243,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=0, help="seed for ICL example selection and --limit sampling")
     parser.add_argument("--limit", type=int, default=None, help="random sample of N molecules per dataset")
     parser.add_argument("--thinking", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--thinking-effort", choices=["low", "medium", "high", "max"], default="medium",
+                        help="reasoning_effort sent with --thinking; high and max both map to Qwen3.8's "
+                             "xhigh, its default and most verbose level")
     parser.add_argument("--max-output-tokens", type=int, default=None,
                         help="default: 1024, or 16384 with --thinking")
     parser.add_argument("--workers", type=int, default=64, help="concurrent requests; vLLM batches them")
@@ -252,7 +277,9 @@ def main(argv: list[str] | None = None) -> None:
     model_slug = args.model.rstrip("/").split("/")[-1]
     args.wandb_project = "Molnet_local_llm"
     args.wandb_run_name = model_slug
-    args.run_name = f"{model_slug}{'_think' if args.thinking else ''}"
+    # Effort is in the name so each level gets its own results.jsonl; sharing one would make the
+    # resume logic skip every request already answered at another level.
+    args.run_name = f"{model_slug}{f'_think_{args.thinking_effort}' if args.thinking else ''}"
     run_dir = Path(args.out_root) / args.run_name
     os.makedirs(run_dir, exist_ok=True)
     print(f"writing to {run_dir}")
