@@ -1,4 +1,12 @@
 model,dataset,k,seed,metric,value,n,tasks_scored,parse_fail_rate,fill_rate,input_tokens,cache_read_tokens,output_tokens,cost_usd
+hosted_vllm/Qwen/Qwen3.8-27B,bace_classification,0,0,roc_auc,0.4773550724637682,152,1,0.0,0.0,0,0,0,
+hosted_vllm/Qwen/Qwen3.8-27B,bace_regression,0,0,rmse,1.3651782251206073,152,1,0.0,0.0,0,0,0,
 hosted_vllm/Qwen/Qwen3.8-27B,bbbp,0,0,roc_auc,0.6214606741573033,189,1,0.0,0.0,0,0,0,
 hosted_vllm/Qwen/Qwen3.8-27B,bbbp,5,0,roc_auc,0.6498314606741573,189,1,0.0,0.0,0,0,0,
 hosted_vllm/Qwen/Qwen3.8-27B,bbbp,20,0,roc_auc,0.6665168539325844,189,1,0.0,0.0,0,0,0,
+hosted_vllm/Qwen/Qwen3.8-27B,clearance,0,0,rmse,69.03175808140426,84,1,0.0,0.0,0,0,0,
+hosted_vllm/Qwen/Qwen3.8-27B,clintox,0,0,roc_auc,0.5299199491265478,143,2,0.0,0.0,0,0,0,
+hosted_vllm/Qwen/Qwen3.8-27B,delaney,0,0,rmse,1.782989577047047,113,1,0.0,0.0,0,0,0,
+hosted_vllm/Qwen/Qwen3.8-27B,freesolv,0,0,rmse,7.082860565230858,65,1,0.0,0.0,0,0,0,
+hosted_vllm/Qwen/Qwen3.8-27B,hiv,0,0,roc_auc,0.5438985228002569,1429,1,0.0,0.0,0,0,0,
+hosted_vllm/Qwen/Qwen3.8-27B,lipo,0,0,rmse,1.3099916393771738,420,1,0.0,0.0,0,0,0,
