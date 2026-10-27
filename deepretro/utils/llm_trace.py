@@ -654,6 +654,91 @@ def _extract_usage(response: Any) -> dict[str, int] | None:
     return counts or None
 
 
+def _field(obj: Any, key: str) -> Any:
+    """Read ``key`` off a dict or an attribute-style provider object.
+
+    Examples
+    --------
+    >>> _field({"a": 1}, "a"), _field(None, "a")
+    (1, None)
+    """
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
+def set_reasoning_output(span: Any, response: Any) -> None:
+    """Put the response's ``reasoning_content`` into a Langfuse span's output.
+
+    litellm's ``langfuse_otel`` callback records only the message ``role`` and
+    ``content``, so a reasoning trace returned separately (vLLM with
+    ``--reasoning-parser``) never reaches Langfuse. This sets
+    ``langfuse.observation.output``, which Langfuse prefers over litellm's
+    ``output.value``, to the assistant message including the reasoning. A
+    no-op when the response carries no reasoning.
+
+    Parameters
+    ----------
+    span : Any
+        OpenTelemetry span exposing ``set_attribute``.
+    response : Any
+        LiteLLM response (dict or ``ModelResponse``).
+
+    Examples
+    --------
+    >>> set_reasoning_output(None, {"choices": [{"message": {"content": "x"}}]})
+    """
+    choices = _field(response, "choices")
+    if not choices:
+        return
+    message = _field(choices[0], "message")
+    reasoning = _field(message, "reasoning_content")
+    if not reasoning:
+        return
+    output = {
+        "role": _field(message, "role") or "assistant",
+        "content": _field(message, "content"),
+        "reasoning_content": reasoning,
+    }
+    span.set_attribute("langfuse.observation.output", json.dumps(output, default=str))
+
+
+def include_reasoning_in_langfuse_output() -> None:
+    """Make litellm's ``langfuse_otel`` spans include ``reasoning_content``.
+
+    Wraps ``LangfuseOtelLogger.set_langfuse_otel_attributes`` (litellm calls
+    it by class name, so a subclass would be ignored) to also run
+    :func:`set_reasoning_output`. Idempotent, honours
+    ``litellm.turn_off_message_logging``, and never raises.
+
+    Examples
+    --------
+    >>> include_reasoning_in_langfuse_output()  # doctest: +SKIP
+    """
+    try:
+        import litellm
+        from litellm.integrations.langfuse.langfuse_otel import LangfuseOtelLogger
+    except Exception as exc:  # pragma: no cover - depends on the litellm version
+        logger.warning("llm_trace.langfuse_reasoning_unavailable", error=str(exc))
+        return
+
+    original = LangfuseOtelLogger.set_langfuse_otel_attributes
+    if getattr(original, "_deepretro_reasoning", False):
+        return
+
+    def set_langfuse_otel_attributes(span: Any, kwargs: Any, response_obj: Any) -> None:
+        original(span, kwargs, response_obj)
+        if litellm.turn_off_message_logging is True:
+            return
+        try:
+            set_reasoning_output(span, response_obj)
+        except Exception as exc:
+            _warn_once("llm_trace.langfuse_reasoning_failed", str(exc))
+
+    set_langfuse_otel_attributes._deepretro_reasoning = True  # type: ignore[attr-defined]
+    LangfuseOtelLogger.set_langfuse_otel_attributes = staticmethod(set_langfuse_otel_attributes)
+
+
 def record_llm_call(
     *,
     stage: str,

@@ -34,12 +34,14 @@ from deepretro.utils.llm_interface import (
     create_llm_interface,
     parse_cot_response as interface_parse_cot_response,
 )
+from deepretro.utils.llm_trace import include_reasoning_in_langfuse_output
 from deepretro.utils.utils_molecule import validity_check
 
 load_dotenv()
 
 # litellm.success_callback = ["langfuse"]
 litellm.callbacks = ["langfuse_otel"]
+include_reasoning_in_langfuse_output()  # the callback drops reasoning_content otherwise
 os.environ["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] = "false"  # no raw_gen_ai_request spans
 litellm.drop_params = True
 

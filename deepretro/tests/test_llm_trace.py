@@ -592,3 +592,33 @@ def test_langfuse_configured_requires_both_keys(monkeypatch: pytest.MonkeyPatch)
     assert llm_trace.langfuse_configured() is False
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk")
     assert llm_trace.langfuse_configured() is True
+
+
+# ---------------------------------------------------------------------------
+# reasoning_content in the Langfuse output
+# ---------------------------------------------------------------------------
+
+
+class FakeSpan:
+    """OpenTelemetry span stand-in that records attributes."""
+
+    def __init__(self) -> None:
+        self.attributes: dict[str, Any] = {}
+
+    def set_attribute(self, key: str, value: Any) -> None:
+        self.attributes[key] = value
+
+
+def test_reasoning_content_is_set_as_langfuse_output() -> None:
+    span = FakeSpan()
+    message = {"role": "assistant", "content": "{}", "reasoning_content": "because"}
+    llm_trace.set_reasoning_output(span, {"choices": [{"message": message}]})
+    assert json.loads(span.attributes["langfuse.observation.output"]) == message
+
+
+def test_no_langfuse_output_without_reasoning_content() -> None:
+    span = FakeSpan()
+    message = {"role": "assistant", "content": "{}", "reasoning_content": None}
+    llm_trace.set_reasoning_output(span, {"choices": [{"message": message}]})
+    llm_trace.set_reasoning_output(span, {"choices": []})
+    assert span.attributes == {}
