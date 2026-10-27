@@ -1,0 +1,4 @@
+model,dataset,k,seed,metric,value,n,tasks_scored,parse_fail_rate,fill_rate,input_tokens,cache_read_tokens,output_tokens,cost_usd
+hosted_vllm/Qwen/Qwen3.8-27B,bbbp,0,0,roc_auc,0.6214606741573033,189,1,0.0,0.0,0,0,0,
+hosted_vllm/Qwen/Qwen3.8-27B,bbbp,5,0,roc_auc,0.6498314606741573,189,1,0.0,0.0,0,0,0,
+hosted_vllm/Qwen/Qwen3.8-27B,bbbp,20,0,roc_auc,0.6665168539325844,189,1,0.0,0.0,0,0,0,
