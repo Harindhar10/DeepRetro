@@ -78,29 +78,31 @@ def _langfuse_metadata(base: dict[str, Any] | None, *, stage: str) -> dict[str, 
 llm_interface.langfuse_metadata = _langfuse_metadata
 
 
-def build_requests(args: argparse.Namespace) -> list[tuple[str, int, int, str]]:
-    """``(dataset, k, row, custom_id)`` for every query, sampled as ``run_eval.py`` does."""
+def build_requests(args: argparse.Namespace) -> list[tuple[str, int, int, int, str]]:
+    """``(dataset, k, seed, row, custom_id)`` for every query, sampled per seed as ``run_eval.py`` does."""
     requests = []
-    for dataset in args.datasets:
-        test = load_split(dataset, args.split)
-        rows = test.index
-        if args.limit:
-            rows = test.sample(n=min(args.limit, len(test)), random_state=args.seed).index
-        requests += [(dataset, k, int(row), f"{dataset}-k{k}-r{int(row)}")
-                     for k in args.shots for row in rows]
+    for seed in args.seeds:
+        for dataset in args.datasets:
+            test = load_split(dataset, args.split)
+            rows = test.index
+            if args.limit:
+                rows = test.sample(n=min(args.limit, len(test)), random_state=seed).index
+            requests += [(dataset, k, seed, int(row), f"{dataset}-k{k}-s{seed}-r{int(row)}")
+                         for k in args.shots for row in rows]
     return requests
 
 
-def generate_one(args: argparse.Namespace, dataset: str, k: int, row: int, custom_id: str) -> dict[str, Any]:
-    """Run one query and return its record, in ``run_eval.make_record``'s schema."""
-    messages = build_messages(dataset, args.split, k, row, args.seed)
+def generate_one(args: argparse.Namespace, dataset: str, k: int, seed: int, row: int,
+                 custom_id: str) -> dict[str, Any]:
+    """Run one query and return its record, in ``run_eval.make_record``'s schema plus ``seed``."""
+    messages = build_messages(dataset, args.split, k, row, seed)
     smiles = load_split(dataset, args.split).loc[row, "smiles"]
     # vLLM and DeepRetro's ChatMessage take string content, not text parts.
     messages = [{"role": "system", "content": system_text(messages)}, messages[1]]
     _query_metadata.set({
         "session_id": args.run_name, "trace_name": f"{dataset}/k{k}", "generation_name": "predict",
-        "tags": [args.model, dataset, f"k={k}", "local"],
-        "trace_metadata": {"dataset": dataset, "k": k, "row": row}, "dataset": dataset,
+        "tags": [args.model, dataset, f"k={k}", f"seed={seed}", "local"],
+        "trace_metadata": {"dataset": dataset, "k": k, "seed": seed, "row": row}, "dataset": dataset,
     })
     # call_LLM returns only (status, text); call the interface for the separate trace and its usage.
     response = create_llm_interface(args.model).call(LLMRequest(
@@ -130,7 +132,7 @@ def generate_one(args: argparse.Namespace, dataset: str, k: int, row: int, custo
     return {
         "run_id": args.run_name, "model": args.model, "provider": "local", "mode": "local",
         "thinking": args.thinking, "thinking_effort": args.thinking_effort if args.thinking else None,
-        "dataset": dataset, "k": k, "row": row, "custom_id": custom_id,
+        "dataset": dataset, "k": k, "seed": seed, "row": row, "custom_id": custom_id,
         "text": text, "reasoning": reasoning, "predictions": predictions, "status": rec_status,
         "error": error, "stop_reason": None, "input_tokens": 0, "output_tokens": 0,
         "cache_read_tokens": 0, "cache_write_tokens": 0,
@@ -174,7 +176,8 @@ def log_wandb(args: argparse.Namespace, metrics: pd.DataFrame,
         "task": "molnet", "model": args.model, "thinking": args.thinking,
         "thinking_effort": args.thinking_effort if args.thinking else None,
         "max_output_tokens": args.max_output_tokens, "workers": args.workers,
-        "datasets": args.datasets, "shots": args.shots, "limit": args.limit, "tag": args.tag,
+        "datasets": args.datasets, "shots": args.shots, "seeds": args.seeds, "limit": args.limit,
+        "tag": args.tag,
     }
     try:
         import wandb
@@ -189,10 +192,14 @@ def log_wandb(args: argparse.Namespace, metrics: pd.DataFrame,
         if not metrics.empty:
             run.log({"metrics": wandb.Table(dataframe=metrics)})
             for row in metrics.itertuples():
-                prefix = f"{row.dataset}/k{row.k}"
+                prefix = f"{row.dataset}/k{row.k}/s{row.seed}"
                 run.summary.update({f"{prefix}/{row.metric}": row.value,
                                     f"{prefix}/parse_fail_rate": row.parse_fail_rate,
                                     f"{prefix}/fill_rate": row.fill_rate})
+            across = metrics.groupby(["dataset", "k", "metric"])["value"].agg(["mean", "std"])
+            for (dataset, k, metric), stats in across.iterrows():
+                run.summary.update({f"{dataset}/k{k}/{metric}_mean": stats["mean"],
+                                    f"{dataset}/k{k}/{metric}_std": stats["std"]})
         run.finish()
     except Exception as exc:
         print(f"W&B logging failed: {exc}")
@@ -204,8 +211,13 @@ def run_generation(args: argparse.Namespace, run_dir: Path) -> tuple[dict[str, A
     Returns ``(perf summary, gauge samples)`` when ``--perf`` recorded a window, else ``None``.
     """
     results = load_results(run_dir)
-    done = set() if results.empty else set(results.loc[results["status"] != "api_error", "custom_id"])
-    todo = [r for r in build_requests(args) if r[3] not in done]
+    done = set()
+    if not results.empty:
+        # Keyed on columns, not custom_id: records from before --seeds have no seed and count as seed 0.
+        usable = results[results["status"] != "api_error"]
+        seeds = usable["seed"].fillna(0) if "seed" in usable else pd.Series(0, index=usable.index)
+        done = set(zip(usable["dataset"], usable["k"].astype(int), seeds.astype(int), usable["row"].astype(int)))
+    todo = [r for r in build_requests(args) if r[:4] not in done]
     print(f"{len(done)} already done, generating {len(todo)}")
     if not todo:
         return None
@@ -240,7 +252,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--shots", default=",".join(map(str, DEFAULT_SHOTS)),
                         help="comma-separated k values; 0 = zero-shot")
     parser.add_argument("--split", default="test")
-    parser.add_argument("--seed", type=int, default=0, help="seed for ICL example selection and --limit sampling")
+    parser.add_argument("--seeds", default="0",
+                        help="comma-separated seeds for ICL example selection and --limit sampling; "
+                             "each seed is a full pass, scored separately")
     parser.add_argument("--limit", type=int, default=None, help="random sample of N molecules per dataset")
     parser.add_argument("--thinking", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--thinking-effort", choices=["low", "medium", "high", "max"], default="medium",
@@ -271,6 +285,7 @@ def main(argv: list[str] | None = None) -> None:
     if unknown:
         sys.exit(f"Unknown datasets: {unknown}. Choose from {list(DATASETS)}")
     args.shots = [int(s) for s in args.shots.split(",")]
+    args.seeds = [int(s) for s in args.seeds.split(",")]
     if args.max_output_tokens is None:
         args.max_output_tokens = 16384 if args.thinking else 1024
 
@@ -285,7 +300,7 @@ def main(argv: list[str] | None = None) -> None:
     print(f"writing to {run_dir}")
 
     perf = run_generation(args, run_dir)
-    metrics = evaluate_run(run_dir, args.split)
+    metrics = evaluate_run(run_dir, args.split, default_seed=0)  # pre---seeds records were seed 0
     if not metrics.empty:
         metrics.to_csv(run_dir / "metrics.csv", index=False)
         print(f"\nwrote {run_dir / 'metrics.csv'}")
