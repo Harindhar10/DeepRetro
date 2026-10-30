@@ -23,7 +23,12 @@ from deepretro.utils.llm_helpers import (
     extract_tag_content,
     resolve_model_selection,
 )
-from deepretro.utils.llm_trace import elapsed_ms, langfuse_metadata, record_llm_call
+from deepretro.utils.llm_trace import (
+    elapsed_ms,
+    langfuse_metadata,
+    reasoning_text,
+    record_llm_call,
+)
 from deepretro.utils.utils_molecule import detect_seven_member_rings
 from deepretro.utils.variables import (
     ADDON_PROMPT_7_MEMBER,
@@ -324,7 +329,7 @@ class LLMInterface(ABC):
                 response = completion(**params)
                 message = response.choices[0].message
                 response_text = coerce_response_text(message.content)
-                reasoning = coerce_response_text(getattr(message, "reasoning_content", None))
+                reasoning = reasoning_text(message)
                 record_llm_call(
                     stage="retrosynthesis",
                     model=self.selection.completion_model,

@@ -613,7 +613,17 @@ def test_reasoning_content_is_set_as_langfuse_output() -> None:
     span = FakeSpan()
     message = {"role": "assistant", "content": "{}", "reasoning_content": "because"}
     llm_trace.set_reasoning_output(span, {"choices": [{"message": message}]})
-    assert json.loads(span.attributes["langfuse.observation.output"]) == message
+    assert json.loads(span.attributes["langfuse.observation.output"]) == {
+        "role": "assistant", "content": "{}", "reasoning": "because",
+    }
+    assert span.attributes["langfuse.observation.metadata.reasoning"] == "because"
+
+
+def test_reasoning_field_is_used_when_reasoning_content_is_absent() -> None:
+    span = FakeSpan()
+    message = {"role": "assistant", "content": "{}", "reasoning": "because"}
+    llm_trace.set_reasoning_output(span, {"choices": [{"message": message}]})
+    assert span.attributes["langfuse.observation.metadata.reasoning"] == "because"
 
 
 def test_no_langfuse_output_without_reasoning_content() -> None:

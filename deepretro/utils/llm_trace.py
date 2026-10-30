@@ -667,15 +667,32 @@ def _field(obj: Any, key: str) -> Any:
     return getattr(obj, key, None)
 
 
+def reasoning_text(message: Any) -> str:
+    """Return a message's separate reasoning trace, or ``""`` when absent.
+
+    vLLM's ``--reasoning-parser`` puts the trace in ``reasoning_content``;
+    newer vLLM releases name the field ``reasoning`` instead.
+
+    Examples
+    --------
+    >>> reasoning_text({"reasoning": "because"}), reasoning_text(None)
+    ('because', '')
+    """
+    reasoning = _field(message, "reasoning_content") or _field(message, "reasoning")
+    return reasoning if isinstance(reasoning, str) else ""
+
+
 def set_reasoning_output(span: Any, response: Any) -> None:
-    """Put the response's ``reasoning_content`` into a Langfuse span's output.
+    """Put the response's reasoning trace into a Langfuse span.
 
     litellm's ``langfuse_otel`` callback records only the message ``role`` and
     ``content``, so a reasoning trace returned separately (vLLM with
     ``--reasoning-parser``) never reaches Langfuse. This sets
     ``langfuse.observation.output``, which Langfuse prefers over litellm's
-    ``output.value``, to the assistant message including the reasoning. A
-    no-op when the response carries no reasoning.
+    ``output.value``, to the assistant message including the reasoning, and
+    ``langfuse.observation.metadata.reasoning`` to the trace itself (Langfuse's
+    pretty view of a chat message hides keys other than ``content``). A no-op
+    when the response carries no reasoning.
 
     Parameters
     ----------
@@ -692,15 +709,16 @@ def set_reasoning_output(span: Any, response: Any) -> None:
     if not choices:
         return
     message = _field(choices[0], "message")
-    reasoning = _field(message, "reasoning_content")
+    reasoning = reasoning_text(message)
     if not reasoning:
         return
     output = {
         "role": _field(message, "role") or "assistant",
         "content": _field(message, "content"),
-        "reasoning_content": reasoning,
+        "reasoning": reasoning,
     }
     span.set_attribute("langfuse.observation.output", json.dumps(output, default=str))
+    span.set_attribute("langfuse.observation.metadata.reasoning", reasoning)
 
 
 def include_reasoning_in_langfuse_output() -> None:
@@ -737,6 +755,10 @@ def include_reasoning_in_langfuse_output() -> None:
 
     set_langfuse_otel_attributes._deepretro_reasoning = True  # type: ignore[attr-defined]
     LangfuseOtelLogger.set_langfuse_otel_attributes = staticmethod(set_langfuse_otel_attributes)
+    logger.info(
+        "llm_trace.langfuse_reasoning_enabled",
+        litellm_version=getattr(litellm, "__version__", None) or getattr(litellm, "version", None),
+    )
 
 
 def record_llm_call(
