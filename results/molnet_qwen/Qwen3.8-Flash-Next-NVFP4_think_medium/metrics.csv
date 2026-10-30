@@ -1,0 +1,2 @@
+model,dataset,k,seed,metric,value,n,tasks_scored,parse_fail_rate,fill_rate,input_tokens,cache_read_tokens,output_tokens,cost_usd
+hosted_vllm/Inferact/Qwen3.8-Flash-Next-NVFP4,bbbp,0,0,roc_auc,0.7096067415730336,189,1,0.0,0.0,0,0,0,
